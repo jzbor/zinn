@@ -6,3 +6,4 @@
 	- [ ] Global constants
 	- [ ] Shell primitive
 - [ ] Job parameters
+- [ ] Handling of intermediary files
