@@ -37,15 +37,27 @@ impl JobDescription {
     /// Resolve templates and dependencies
     pub fn realize(&self, name: &str, job_descriptions: &HashMap<String, JobDescription>, handlebars: &Handlebars, constants: &HashMap<String, String>, parameters: &HashMap<String, String>) -> ZinnResult<JobRealization> {
         let mut dependencies = Vec::new();
+
+        let mut combined_vars = constants.clone();
+        for arg in &self.args {
+            match parameters.get(arg) {
+                Some(val) => { combined_vars.insert(arg.to_owned(), val.to_owned()); },
+                None => Err(ZinnError::MissingArgument(arg.to_owned()))?,
+            }
+        }
+
         for (dep_name, dep_desc) in &self.requires {
+            let mut realized_dep_desc = dep_desc.clone();
+            for val in realized_dep_desc.values_mut() {
+                *val = handlebars.render_template(val, &combined_vars)?;
+            }
+
             match job_descriptions.get(dep_name) {
-                Some(desc) => dependencies.push(desc.realize(dep_name, job_descriptions, handlebars, constants, &dep_desc)?),
+                Some(desc) => dependencies.push(desc.realize(dep_name, job_descriptions, handlebars, constants, &realized_dep_desc)?),
                 None => return Err(ZinnError::DependencyNotFound(dep_name.to_owned())),
             }
         }
 
-        let mut combined_vars = constants.clone();
-        combined_vars.extend(parameters.into_iter().map(|(k, v)| (k.clone(), v.clone())));
         let run = handlebars.render_template(&self.run, &combined_vars)?;
 
         Ok(Arc::new(InnerJobRealization {

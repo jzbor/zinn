@@ -15,9 +15,6 @@ pub enum ZinnError {
     #[error("Unable to open stdin")]
     ShellStdin(),
 
-    #[error("Unable to open stdout")]
-    ShellStdout(),
-
     #[error("Child exited unsuccessfully")]
     Child(),
 
@@ -26,6 +23,9 @@ pub enum ZinnError {
 
     #[error("Job not found ({0})")]
     JobNotFound(String),
+
+    #[error("Missing argument \"{0}\"")]
+    MissingArgument(String),
 
     #[error("Template rendering failed - ({0})")]
     TemplateError(#[from] handlebars::RenderError),
