@@ -37,6 +37,7 @@ impl Queue {
 
     pub fn enqueue(&self, job: JobRealization) {
         let mut inner = self.inner.lock().unwrap();
+        if inner.jobs.contains(&job) { return; }
         inner.jobs.push_back(job.clone());
         inner.states.insert(job, JobState::Ready);
         drop(inner);
@@ -73,6 +74,10 @@ impl Queue {
     pub fn done(&self) {
         self.inner.lock().unwrap().done = true;
         self.cond_fetch_job.notify_all();
+    }
+
+    pub fn len(&self) -> usize {
+        self.inner.lock().unwrap().jobs.len()
     }
 }
 

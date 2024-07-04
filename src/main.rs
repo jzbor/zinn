@@ -25,6 +25,9 @@ struct Args {
     #[clap(short, long, default_value_t = String::from("zinn.yml"))]
     zinnfile: String,
 
+    #[clap(default_values_t = [String::from("default")])]
+    targets: Vec<String>,
+
     #[clap(short, long, default_value_t = 4)]
     jobs: usize,
 
@@ -55,14 +58,32 @@ fn main() {
     let main_bar = ProgressBar::new(zinnfile.jobs.len() as u64);
     main_bar.set_style(main_bar_style);
 
-    let threads: Vec<_> = (0..args.jobs).map(|_| {
+    for name in args.targets {
+        let job = match zinnfile.jobs.get(&name) {
+            Some(job) => resolve(job.realize(&name, &zinnfile.jobs, &handlebars, &zinnfile.constants)),
+            None => resolve(Err(ZinnError::JobNotFound(name))),
+        };
+        for dep in job.transitive_dependencies() {
+            queue.enqueue(dep);
+        }
+        queue.enqueue(job);
+    }
+
+    let mut bars: Vec<_> = (0..args.jobs).map(|_| {
         let bar = ProgressBar::new(10000000);
         bar.set_style(ProgressStyle::with_template("{spinner} {prefix:.cyan} {wide_msg}").unwrap());
         bar.enable_steady_tick(Duration::from_millis(75));
         mp.add(bar.clone());
+        bar
+    }).collect();
+
+    main_bar.set_length(queue.len() as u64);
+
+    let threads: Vec<_> = (0..args.jobs).map(|_| {
         let main_bar = main_bar.clone();
         let verbose = args.verbose;
         let queue = queue.clone();
+        let bar = bars.pop().unwrap();
 
         thread::spawn(move || {
             worker::run_worker(queue, bar, main_bar, verbose)
@@ -72,13 +93,6 @@ fn main() {
     mp.add(main_bar.clone());
     main_bar.enable_steady_tick(Duration::new(0, 200000));
 
-    for (name, job) in &zinnfile.jobs {
-        let job = resolve(job.realize(name, &zinnfile.jobs, &handlebars, &zinnfile.constants));
-        for dep in job.transitive_dependencies() {
-            queue.enqueue(dep);
-        }
-        queue.enqueue(job);
-    }
 
     queue.done();
     for thread in threads {

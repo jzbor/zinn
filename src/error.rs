@@ -9,7 +9,7 @@ pub enum ZinnError {
     #[error("File Error - {0}")]
     File(#[from] io::Error),
 
-    #[error("YAML Parsing Error - {0}")]
+    #[error("{0}")]
     Yaml(#[from] serde_yaml::Error),
 
     #[error("Unable to open stdin")]
@@ -23,6 +23,9 @@ pub enum ZinnError {
 
     #[error("Dependency not found ({0})")]
     DependencyNotFound(String),
+
+    #[error("Job not found ({0})")]
+    JobNotFound(String),
 
     #[error("Template rendering failed - ({0})")]
     TemplateError(#[from] handlebars::RenderError),
