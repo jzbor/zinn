@@ -1,4 +1,5 @@
 use clap::Parser;
+use queue::Queue;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
@@ -14,6 +15,7 @@ use job::*;
 mod error;
 mod job;
 mod worker;
+mod queue;
 
 
 #[derive(Parser)]
@@ -41,34 +43,36 @@ fn main() {
 
     let contents = resolve(fs::read_to_string(args.zinnfile));
     let zinnfile: Zinnfile = resolve(serde_yaml::from_str(&contents));
+    let queue = Queue::new();
 
     let mp = MultiProgress::new();
+    let main_bar_style = ProgressStyle::with_template("[{elapsed}] {wide_bar} {pos}/{len}").unwrap();
     let main_bar = ProgressBar::new(zinnfile.jobs.len() as u64);
-
-    let (job_tx, job_rx) = crossbeam::channel::unbounded();
+    main_bar.set_style(main_bar_style);
 
     let threads: Vec<_> = (0..args.jobs).map(|_| {
         let bar = ProgressBar::new(10000000);
-        bar.set_style(ProgressStyle::with_template("{spinner} {prefix:.cyan} {msg}").unwrap());
+        bar.set_style(ProgressStyle::with_template("{spinner} {prefix:.cyan} {wide_msg}").unwrap());
         bar.enable_steady_tick(Duration::from_millis(75));
         mp.add(bar.clone());
-        let job_rx = job_rx.clone();
         let main_bar = main_bar.clone();
         let verbose = args.verbose;
+        let queue = queue.clone();
 
         thread::spawn(move || {
-            worker::run_worker(job_rx, bar, main_bar, verbose)
+            worker::run_worker(queue, bar, main_bar, verbose)
         })
     }).collect();
 
     mp.add(main_bar.clone());
+    main_bar.enable_steady_tick(Duration::new(0, 200000));
 
     for (name, job) in &zinnfile.jobs {
         let job = job.realize(name);
-        job_tx.send(job).unwrap();
+        queue.enqueue(job);
     }
 
-    drop(job_tx);
+    queue.done();
     for thread in threads {
         let _ = thread.join();
     }

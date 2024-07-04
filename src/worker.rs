@@ -2,7 +2,7 @@ use std::fmt::Write;
 
 use indicatif::ProgressBar;
 
-use crate::JobRealization;
+use crate::queue::Queue;
 
 struct BarMessageWriter(ProgressBar);
 struct BarPrintWriter(ProgressBar);
@@ -22,16 +22,19 @@ impl Write for BarPrintWriter {
 }
 
 
-pub fn run_worker(job_rx: crossbeam::channel::Receiver<JobRealization>,
-                  bar: ProgressBar, main_bar: ProgressBar, verbose: bool) {
+pub fn run_worker(queue: Queue, bar: ProgressBar, main_bar: ProgressBar, verbose: bool) {
     let mut status_writer = BarMessageWriter(bar.clone());
     let mut log_writer = BarPrintWriter(bar.clone());
 
     loop {
-        if let Ok(job) = job_rx.recv() {
+        if let Some(job) = queue.fetch() {
             bar.set_prefix(job.name().to_owned());
             if let Err(e) = job.run(&mut status_writer, &mut log_writer, verbose) {
-                bar.println(format!("{}: {}", job.name(), e))
+                bar.println(format!("[FAILED] {}", job.name()));
+                queue.failed(job);
+            } else {
+                bar.println(format!("[DONE] {}", job.name()));
+                queue.finished(job);
             }
             main_bar.inc(1);
         } else {

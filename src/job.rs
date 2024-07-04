@@ -15,7 +15,7 @@ pub struct JobDescription {
 }
 
 /// Executable job with dependencies resolved and all variables applied
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub struct JobRealization {
     name: String,
     run: String,
@@ -71,10 +71,8 @@ impl JobRealization {
 
         let status = process.wait()?;
         if !status.success() {
-            let _ = write!(log_writer, "{}", format!("[FAILED] {}", self.name));
             Err(ZinnError::Child())
         } else {
-            let _ = write!(log_writer, "{}", format!("[DONE] {}", self.name));
             Ok(output)
         }
     }
