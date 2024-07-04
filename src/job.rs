@@ -14,6 +14,7 @@ use crate::error::*;
 /// Template for a job as described in the Zinnfile
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct JobDescription {
+    #[serde(default)]
     run: String,
 
     #[serde(default)]
@@ -88,7 +89,7 @@ impl JobDescription {
 
             if let Some(with_list) = &dep.with_list {
                 let inputs = handlebars.render_template(&with_list.inputs, &combined_vars)?;
-                let val_list = inputs.split(" ");
+                let val_list = inputs.split(char::is_whitespace);
                 for val in val_list {
                     // mutating the environment is fine, as it will be overridden
                     // for every iteration with the proper value.
@@ -103,7 +104,7 @@ impl JobDescription {
         }
 
         let run = handlebars.render_template(&self.run, &combined_vars)?;
-        let name = name.replace("\n", "");
+        let name = name.replace('\n', "");
 
         Ok(Arc::new(InnerJobRealization {
             name, run, dependencies,
@@ -133,7 +134,7 @@ impl InnerJobRealization {
         let output = String::new();
         let mut last_line: Option<String> = None;
 
-        for line in BufReader::new(io_reader).lines().flatten() {
+        for line in BufReader::new(io_reader).lines().map_while(Result::ok) {
             let _ = write!(status_writer, "{}", line);
 
             if verbose {

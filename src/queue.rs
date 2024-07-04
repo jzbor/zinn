@@ -128,7 +128,7 @@ impl InnerQueue {
             }
         }
 
-        return true;
+        true
     }
 
     fn has_alive_tasks(&self) -> bool {
