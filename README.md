@@ -1,9 +1,9 @@
 # Zinn
 
 ## Goals
-- [ ] Job dependencies
-- [ ] Templating via [handlebars](https://docs.rs/handlebars)
-	- [ ] Global constants
+- [x] Job dependencies
+- [x] Templating via [handlebars](https://docs.rs/handlebars)
+	- [x] Global constants
 	- [ ] Shell primitive
 - [ ] Job parameters
 - [ ] Handling of intermediary files

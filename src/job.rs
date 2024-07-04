@@ -5,6 +5,7 @@ use std::io::{BufWriter, BufRead, BufReader};
 use std::io::Write as _;
 use std::sync::Arc;
 
+use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
 
 use crate::error::*;
@@ -31,18 +32,20 @@ pub type JobRealization = Arc<InnerJobRealization>;
 
 impl JobDescription {
     /// Resolve templates and dependencies
-    pub fn realize(&self, name: &str, job_descriptions: &HashMap<String, JobDescription>) -> ZinnResult<JobRealization> {
+    pub fn realize(&self, name: &str, job_descriptions: &HashMap<String, JobDescription>, handlebars: &Handlebars, constants: &HashMap<String, String>) -> ZinnResult<JobRealization> {
         let mut dependencies = Vec::new();
         for dep in &self.requires {
             match job_descriptions.get(dep) {
-                Some(desc) => dependencies.push(desc.realize(&dep, job_descriptions)?),
+                Some(desc) => dependencies.push(desc.realize(&dep, job_descriptions, handlebars, constants)?),
                 None => return Err(ZinnError::DependencyNotFound(dep.to_owned())),
             }
         }
 
+        let run = handlebars.render_template(&self.run, constants)?;
+
         Ok(Arc::new(InnerJobRealization {
             name: name.to_owned(),
-            run: self.run.clone(),
+            run,
             dependencies,
         }))
     }

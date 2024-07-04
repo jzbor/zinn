@@ -1,4 +1,5 @@
 use clap::Parser;
+use handlebars::Handlebars;
 use queue::Queue;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -34,6 +35,9 @@ struct Args {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Zinnfile {
+    #[serde(default)]
+    constants: HashMap<String, String>,
+
     jobs: HashMap<String, JobDescription>,
 }
 
@@ -45,6 +49,7 @@ fn main() {
     let zinnfile: Zinnfile = resolve(serde_yaml::from_str(&contents));
     let queue = Queue::new();
 
+    let handlebars = Handlebars::new();
     let mp = MultiProgress::new();
     let main_bar_style = ProgressStyle::with_template("[{elapsed}] {wide_bar} {pos}/{len}").unwrap();
     let main_bar = ProgressBar::new(zinnfile.jobs.len() as u64);
@@ -68,7 +73,7 @@ fn main() {
     main_bar.enable_steady_tick(Duration::new(0, 200000));
 
     for (name, job) in &zinnfile.jobs {
-        let job = resolve(job.realize(name, &zinnfile.jobs));
+        let job = resolve(job.realize(name, &zinnfile.jobs, &handlebars, &zinnfile.constants));
         for dep in job.transitive_dependencies() {
             queue.enqueue(dep);
         }

@@ -23,6 +23,9 @@ pub enum ZinnError {
 
     #[error("Dependency not found ({0})")]
     DependencyNotFound(String),
+
+    #[error("Template rendering failed - ({0})")]
+    TemplateError(#[from] handlebars::RenderError),
 }
 
 pub fn die(e: impl Into<ZinnError>) -> ! {
