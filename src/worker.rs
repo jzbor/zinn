@@ -27,10 +27,12 @@ pub fn run_worker(queue: Queue, bar: ProgressBar, main_bar: ProgressBar, verbose
     let mut log_writer = BarPrintWriter(bar.clone());
 
     loop {
+        bar.set_prefix("waiting...");
+        bar.set_message("");
         if let Some(job) = queue.fetch() {
             bar.set_prefix(job.name().to_owned());
             if let Err(e) = job.run(&mut status_writer, &mut log_writer, verbose) {
-                bar.println(format!("[FAILED] {}", job.name()));
+                bar.println(format!("[FAILED] {}: {}", job.name(), e));
                 queue.failed(job);
             } else {
                 bar.println(format!("[DONE] {}", job.name()));

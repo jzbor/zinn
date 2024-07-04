@@ -11,7 +11,6 @@ pub struct Queue {
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 enum JobState {
     Ready,
-    NotReady,
     Failed,
     Running,
     Finished,
@@ -93,7 +92,9 @@ impl InnerQueue {
 
     fn all_tasks_distributed(&self) -> bool {
         for (_, state) in &self.states {
-            if *state != JobState::Finished && *state != JobState::Running {
+            if *state != JobState::Finished
+                    && *state != JobState::Running
+                    && *state != JobState::Failed {
                 return false;
             }
         }
