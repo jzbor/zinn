@@ -17,6 +17,7 @@ mod error;
 mod job;
 mod worker;
 mod queue;
+mod hbextensions;
 
 
 #[derive(Parser)]
@@ -54,6 +55,8 @@ fn main() {
 
     let mut handlebars = Handlebars::new();
     handlebars.set_strict_mode(true);
+    hbextensions::register_helpers(&mut handlebars);
+
     let mp = MultiProgress::new();
     let main_bar_style = ProgressStyle::with_template("[{elapsed}] {wide_bar} {pos}/{len}").unwrap();
     let main_bar = ProgressBar::new(zinnfile.jobs.len() as u64);

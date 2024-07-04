@@ -17,7 +17,7 @@ pub struct JobDescription {
     run: String,
 
     #[serde(default)]
-    requires: HashMap<String, HashMap<String, String>>,
+    requires: Vec<JobDependency>,
 
     #[serde(default)]
     args: Vec<String>,
@@ -31,39 +31,82 @@ pub struct InnerJobRealization {
     dependencies: Vec<JobRealization>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct JobDependency {
+    job: String,
+
+    #[serde(default)]
+    with: HashMap<String, String>,
+
+    #[serde(default)]
+    with_list: Option<WithList>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WithList {
+    param: String,
+
+    #[serde(default)]
+    inputs: String,
+}
+
+
 pub type JobRealization = Arc<InnerJobRealization>;
 
 impl JobDescription {
     /// Resolve templates and dependencies
     pub fn realize(&self, name: &str, job_descriptions: &HashMap<String, JobDescription>, handlebars: &Handlebars, constants: &HashMap<String, String>, parameters: &HashMap<String, String>) -> ZinnResult<JobRealization> {
         let mut dependencies = Vec::new();
+        let mut name = name.to_owned();
 
-        let mut combined_vars = constants.clone();
+        let mut combined_vars = HashMap::new();
+        for (name, value) in constants {
+            combined_vars.insert(name.clone(), handlebars.render_template(value, &())?);
+        }
+
         for arg in &self.args {
             match parameters.get(arg) {
-                Some(val) => { combined_vars.insert(arg.to_owned(), val.to_owned()); },
-                None => Err(ZinnError::MissingArgument(arg.to_owned()))?,
+                Some(val) => {
+                    combined_vars.insert(arg.to_owned(), val.to_owned());
+                    name.push(' ');
+                    name.push_str(val);
+                },
+                None => return Err(ZinnError::MissingArgument(arg.to_owned())),
             }
         }
 
-        for (dep_name, dep_desc) in &self.requires {
-            let mut realized_dep_desc = dep_desc.clone();
+        for dep in &self.requires {
+            let mut realized_dep_desc = dep.with.clone();
             for val in realized_dep_desc.values_mut() {
                 *val = handlebars.render_template(val, &combined_vars)?;
             }
 
-            match job_descriptions.get(dep_name) {
-                Some(desc) => dependencies.push(desc.realize(dep_name, job_descriptions, handlebars, constants, &realized_dep_desc)?),
-                None => return Err(ZinnError::DependencyNotFound(dep_name.to_owned())),
+            let dep_desc = match job_descriptions.get(&dep.job) {
+                Some(desc) => desc,
+                None => return Err(ZinnError::DependencyNotFound(dep.job.to_owned())),
+            };
+
+            if let Some(with_list) = &dep.with_list {
+                let inputs = handlebars.render_template(&with_list.inputs, &combined_vars)?;
+                let val_list = inputs.split(" ");
+                for val in val_list {
+                    // mutating the environment is fine, as it will be overridden
+                    // for every iteration with the proper value.
+                    realized_dep_desc.insert(with_list.param.to_owned(), val.to_owned());
+                    let dep_realization = dep_desc.realize(&dep.job, job_descriptions, handlebars, constants, &realized_dep_desc)?;
+                    dependencies.push(dep_realization);
+                }
+            } else {
+                let dep_realization = dep_desc.realize(&dep.job, job_descriptions, handlebars, constants, &realized_dep_desc)?;
+                dependencies.push(dep_realization);
             }
         }
 
         let run = handlebars.render_template(&self.run, &combined_vars)?;
+        let name = name.replace("\n", "");
 
         Ok(Arc::new(InnerJobRealization {
-            name: name.to_owned(),
-            run,
-            dependencies,
+            name, run, dependencies,
         }))
     }
 }
