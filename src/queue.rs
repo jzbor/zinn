@@ -47,7 +47,7 @@ impl Queue {
     pub fn fetch(&self) -> Option<JobRealization> {
         let mut inner = self.inner.lock().unwrap();
         loop {
-            if inner.done && inner.all_tasks_distributed() {
+            if inner.done && !inner.has_alive_tasks() {
                 return None;
             }
 
@@ -105,15 +105,34 @@ impl InnerQueue {
         ret
     }
 
-    fn all_tasks_distributed(&self) -> bool {
-        for state in self.states.values() {
-            if *state != JobState::Finished
-                    && *state != JobState::Running
-                    && *state != JobState::Failed {
+    /// Determines whether the task is running or may be run in the future
+    fn task_alive(&self, job: JobRealization) -> bool {
+        let state = match self.states.get(&job) {
+            Some(state) => *state,
+            None => return false,
+        };
+
+        if state == JobState::Finished || state == JobState::Failed {
+            return false;
+        }
+
+        for dep in job.dependencies() {
+            if !self.task_alive(dep.clone())
+                    && self.states.get(&dep) != Some(JobState::Finished).as_ref() {
                 return false;
             }
         }
 
-        true
+        return true;
+    }
+
+    fn has_alive_tasks(&self) -> bool {
+        for job in &self.jobs {
+            if self.task_alive(job.clone()) {
+                return true;
+            }
+        }
+
+        false
     }
 }
