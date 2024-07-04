@@ -2,6 +2,7 @@ use std::fmt::Write;
 use std::process::{Command, Stdio};
 use std::io::{BufWriter, BufRead, BufReader};
 use std::io::Write as _;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
@@ -16,22 +17,24 @@ pub struct JobDescription {
 
 /// Executable job with dependencies resolved and all variables applied
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
-pub struct JobRealization {
+pub struct InnerJobRealization {
     name: String,
     run: String,
 }
 
+pub type JobRealization = Arc<InnerJobRealization>;
+
 impl JobDescription {
     /// Resolve templates and dependencies
     pub fn realize(&self, name: &str) -> JobRealization {
-        JobRealization {
+        Arc::new(InnerJobRealization {
             name: name.to_owned(),
             run: self.run.clone()
-        }
+        })
     }
 }
 
-impl JobRealization {
+impl InnerJobRealization {
     pub fn run(&self, status_writer: &mut impl Write, log_writer: &mut impl Write, verbose: bool) -> ZinnResult<String> {
         let mut process = Command::new("sh")
             .stdin(Stdio::piped())

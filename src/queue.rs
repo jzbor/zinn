@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, sync::{Arc, Condvar, Mutex}};
+use std::{collections::{HashMap, VecDeque}, sync::{Arc, Condvar, Mutex}};
 
 use crate::JobRealization;
 
@@ -18,7 +18,8 @@ enum JobState {
 }
 
 struct InnerQueue {
-    jobs: VecDeque<(JobRealization, JobState)>,
+    jobs: VecDeque<JobRealization>,
+    states: HashMap<JobRealization, JobState>,
     done: bool,
 }
 
@@ -26,6 +27,7 @@ impl Queue {
     pub fn new() -> Self {
         let inner = InnerQueue {
             jobs: VecDeque::new(),
+            states: HashMap::new(),
             done: false,
         };
         Queue {
@@ -35,8 +37,11 @@ impl Queue {
     }
 
     pub fn enqueue(&self, job: JobRealization) {
-        self.inner.lock().unwrap()
-            .jobs.push_back((job, JobState::Ready));
+        let mut inner = self.inner.lock().unwrap();
+        inner.jobs.push_back(job.clone());
+        inner.states.insert(job, JobState::Ready);
+        drop(inner);
+
         self.cond_fetch_job.notify_one();
     }
 
@@ -56,20 +61,12 @@ impl Queue {
 
     pub fn finished(&self, finished_job: JobRealization) {
         let mut inner = self.inner.lock().unwrap();
-        for (job, state) in &mut inner.jobs {
-            if finished_job == *job {
-                *state = JobState::Finished;
-            }
-        }
+        inner.states.insert(finished_job, JobState::Finished);
     }
 
     pub fn failed(&self, failed_job: JobRealization) {
         let mut inner = self.inner.lock().unwrap();
-        for (job, state) in &mut inner.jobs {
-            if failed_job == *job {
-                *state = JobState::Finished;
-            }
-        }
+        inner.states.insert(failed_job, JobState::Failed);
     }
 
     pub fn done(&self) {
@@ -80,18 +77,22 @@ impl Queue {
 
 impl InnerQueue {
     fn get_ready(&mut self) -> Option<JobRealization> {
-        for (job, state) in &mut self.jobs {
-            if *state == JobState::Ready {
-                *state = JobState::Running;
-                return Some(job.clone());
+        let mut ret = None;
+        for job in &self.jobs {
+            if *self.states.get(job).unwrap() == JobState::Ready {
+                ret = Some(job.clone())
             }
         }
 
-        None
+        if let Some(job) = &ret {
+            self.states.insert(job.clone(), JobState::Running);
+        }
+
+        ret
     }
 
     fn all_tasks_distributed(&self) -> bool {
-        for (_, state) in &self.jobs {
+        for (_, state) in &self.states {
             if *state != JobState::Finished && *state != JobState::Running {
                 return false;
             }
