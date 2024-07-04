@@ -24,6 +24,7 @@ jobs:
           param: path
           inputs: "{{SOURCES}}"
     input_list: "{{subst SOURCES '.c' '.o'}}"
+    output_list: "{{BIN}}"
     run: |
       echo "linking."
       sleep 1

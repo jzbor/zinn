@@ -34,6 +34,15 @@ struct Args {
 
     #[clap(short, long)]
     verbose: bool,
+
+    #[clap(short, long)]
+    force: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct Options {
+    verbose: bool,
+    force: bool,
 }
 
 
@@ -45,11 +54,19 @@ struct Zinnfile {
     jobs: HashMap<String, JobDescription>,
 }
 
+impl Args {
+    fn options(&self) -> Options {
+        Options {
+            verbose: self.verbose,
+            force: self.force,
+        }
+    }
+}
 
 fn main() {
     let args = Args::parse();
 
-    let contents = resolve(fs::read_to_string(args.zinnfile));
+    let contents = resolve(fs::read_to_string(&args.zinnfile));
     let zinnfile: Zinnfile = resolve(serde_yaml::from_str(&contents));
     let queue = Queue::new();
 
@@ -62,10 +79,10 @@ fn main() {
     let main_bar = ProgressBar::new(zinnfile.jobs.len() as u64);
     main_bar.set_style(main_bar_style);
 
-    for name in args.targets {
-        let job = match zinnfile.jobs.get(&name) {
+    for name in &args.targets {
+        let job = match zinnfile.jobs.get(name) {
             Some(job) => resolve(job.realize(&name, &zinnfile.jobs, &handlebars, &zinnfile.constants, &HashMap::new())),
-            None => resolve(Err(ZinnError::JobNotFound(name))),
+            None => resolve(Err(ZinnError::JobNotFound(name.to_owned()))),
         };
         for dep in job.transitive_dependencies() {
             queue.enqueue(dep);
@@ -76,8 +93,9 @@ fn main() {
     let mut bars: Vec<_> = (0..args.jobs).map(|_| {
         let bar = ProgressBar::new(10000000);
         bar.set_style(ProgressStyle::with_template("{spinner} {prefix:.cyan} {wide_msg}").unwrap());
-        bar.enable_steady_tick(Duration::from_millis(75));
         mp.add(bar.clone());
+        bar.tick();
+        bar.enable_steady_tick(Duration::from_millis(75));
         bar
     }).collect();
 
@@ -85,17 +103,17 @@ fn main() {
 
     let threads: Vec<_> = (0..args.jobs).map(|_| {
         let main_bar = main_bar.clone();
-        let verbose = args.verbose;
         let queue = queue.clone();
         let bar = bars.pop().unwrap();
+        let options = args.options();
 
         thread::spawn(move || {
-            worker::run_worker(queue, bar, main_bar, verbose)
+            worker::run_worker(queue, bar, main_bar, options)
         })
     }).collect();
 
     mp.add(main_bar.clone());
-    main_bar.enable_steady_tick(Duration::new(0, 200000));
+    main_bar.enable_steady_tick(Duration::from_millis(75));
 
 
     queue.done();

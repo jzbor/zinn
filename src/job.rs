@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::Write;
+use std::fs;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::io::{BufWriter, BufRead, BufReader};
@@ -10,6 +11,7 @@ use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
 
 use crate::error::*;
+use crate::Options;
 
 
 /// Template for a job as described in the Zinnfile
@@ -147,10 +149,34 @@ impl JobDescription {
 }
 
 impl InnerJobRealization {
-    pub fn run(&self, status_writer: &mut impl Write, log_writer: &mut impl Write, verbose: bool) -> ZinnResult<String> {
+    pub fn run(&self, status_writer: &mut impl Write, log_writer: &mut impl Write, args: &Options) -> ZinnResult<String> {
+        // check if all input files exist
         for file in &self.inputs {
             if !Path::new(file).exists() {
                 return Err(ZinnError::InputFileError(file.to_owned()));
+            }
+        }
+
+        // check if any input file is newer than any output file
+        if !args.force && self.inputs.len() != 0 && self.outputs.len() != 0 {
+            let mut dirty = false;
+            for output in &self.outputs {
+                if !Path::new(output).exists() {
+                    dirty = true;
+                    break;
+                }
+
+                for input in &self.inputs {
+                    let out_time = fs::metadata(output)?.modified()?;
+                    let in_time = fs::metadata(input)?.modified()?;
+                    if in_time > out_time {
+                        dirty = true;
+                        break;
+                    }
+                }
+            }
+            if !dirty {
+                return Ok(String::from("Nothing to do"));
             }
         }
 
@@ -177,7 +203,7 @@ impl InnerJobRealization {
         for line in BufReader::new(io_reader).lines().map_while(Result::ok) {
             let _ = write!(status_writer, "{}", line);
 
-            if verbose {
+            if args.verbose {
                 if let Some(line) = last_line.take() {
                     let _ = write!(log_writer, "{}", format!("{}: {}", self.name, line));
                 }

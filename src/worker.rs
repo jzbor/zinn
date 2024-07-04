@@ -3,6 +3,7 @@ use std::fmt::Write;
 use indicatif::ProgressBar;
 
 use crate::queue::Queue;
+use crate::Options;
 
 struct BarMessageWriter(ProgressBar);
 struct BarPrintWriter(ProgressBar);
@@ -22,7 +23,7 @@ impl Write for BarPrintWriter {
 }
 
 
-pub fn run_worker(queue: Queue, bar: ProgressBar, main_bar: ProgressBar, verbose: bool) {
+pub fn run_worker(queue: Queue, bar: ProgressBar, main_bar: ProgressBar, options: Options) {
     let mut status_writer = BarMessageWriter(bar.clone());
     let mut log_writer = BarPrintWriter(bar.clone());
 
@@ -31,7 +32,7 @@ pub fn run_worker(queue: Queue, bar: ProgressBar, main_bar: ProgressBar, verbose
         bar.set_message("");
         if let Some(job) = queue.fetch() {
             bar.set_prefix(job.name().to_owned());
-            if let Err(e) = job.run(&mut status_writer, &mut log_writer, verbose) {
+            if let Err(e) = job.run(&mut status_writer, &mut log_writer, &options) {
                 bar.println(format!("[FAILED] {}: {}", job.name(), e));
                 queue.failed(job);
             } else {
