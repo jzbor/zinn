@@ -17,7 +17,10 @@ pub struct JobDescription {
     run: String,
 
     #[serde(default)]
-    requires: Vec<String>,
+    requires: HashMap<String, HashMap<String, String>>,
+
+    #[serde(default)]
+    args: Vec<String>,
 }
 
 /// Executable job with dependencies resolved and all variables applied
@@ -32,16 +35,18 @@ pub type JobRealization = Arc<InnerJobRealization>;
 
 impl JobDescription {
     /// Resolve templates and dependencies
-    pub fn realize(&self, name: &str, job_descriptions: &HashMap<String, JobDescription>, handlebars: &Handlebars, constants: &HashMap<String, String>) -> ZinnResult<JobRealization> {
+    pub fn realize(&self, name: &str, job_descriptions: &HashMap<String, JobDescription>, handlebars: &Handlebars, constants: &HashMap<String, String>, parameters: &HashMap<String, String>) -> ZinnResult<JobRealization> {
         let mut dependencies = Vec::new();
-        for dep in &self.requires {
-            match job_descriptions.get(dep) {
-                Some(desc) => dependencies.push(desc.realize(&dep, job_descriptions, handlebars, constants)?),
-                None => return Err(ZinnError::DependencyNotFound(dep.to_owned())),
+        for (dep_name, dep_desc) in &self.requires {
+            match job_descriptions.get(dep_name) {
+                Some(desc) => dependencies.push(desc.realize(dep_name, job_descriptions, handlebars, constants, &dep_desc)?),
+                None => return Err(ZinnError::DependencyNotFound(dep_name.to_owned())),
             }
         }
 
-        let run = handlebars.render_template(&self.run, constants)?;
+        let mut combined_vars = constants.clone();
+        combined_vars.extend(parameters.into_iter().map(|(k, v)| (k.clone(), v.clone())));
+        let run = handlebars.render_template(&self.run, &combined_vars)?;
 
         Ok(Arc::new(InnerJobRealization {
             name: name.to_owned(),
@@ -53,7 +58,7 @@ impl JobDescription {
 
 impl InnerJobRealization {
     pub fn run(&self, status_writer: &mut impl Write, log_writer: &mut impl Write, verbose: bool) -> ZinnResult<String> {
-        let (mut io_reader, io_writer) = os_pipe::pipe()?;
+        let (io_reader, io_writer) = os_pipe::pipe()?;
 
         let mut process = Command::new("sh")
             .stdin(Stdio::piped())

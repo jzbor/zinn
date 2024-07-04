@@ -52,7 +52,8 @@ fn main() {
     let zinnfile: Zinnfile = resolve(serde_yaml::from_str(&contents));
     let queue = Queue::new();
 
-    let handlebars = Handlebars::new();
+    let mut handlebars = Handlebars::new();
+    handlebars.set_strict_mode(true);
     let mp = MultiProgress::new();
     let main_bar_style = ProgressStyle::with_template("[{elapsed}] {wide_bar} {pos}/{len}").unwrap();
     let main_bar = ProgressBar::new(zinnfile.jobs.len() as u64);
@@ -60,7 +61,7 @@ fn main() {
 
     for name in args.targets {
         let job = match zinnfile.jobs.get(&name) {
-            Some(job) => resolve(job.realize(&name, &zinnfile.jobs, &handlebars, &zinnfile.constants)),
+            Some(job) => resolve(job.realize(&name, &zinnfile.jobs, &handlebars, &zinnfile.constants, &HashMap::new())),
             None => resolve(Err(ZinnError::JobNotFound(name))),
         };
         for dep in job.transitive_dependencies() {
