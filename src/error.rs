@@ -29,6 +29,12 @@ pub enum ZinnError {
 
     #[error("Template rendering failed - ({0})")]
     TemplateError(#[from] handlebars::RenderError),
+
+    #[error("Missing input file \"{0}\"")]
+    InputFileError(String),
+
+    #[error("Missing output file \"{0}\"")]
+    OutputFileError(String),
 }
 
 pub fn die(e: impl Into<ZinnError>) -> ! {

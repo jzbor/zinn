@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::Write;
+use std::path::Path;
 use std::process::{Command, Stdio};
 use std::io::{BufWriter, BufRead, BufReader};
 use std::io::Write as _;
@@ -22,6 +23,18 @@ pub struct JobDescription {
 
     #[serde(default)]
     args: Vec<String>,
+
+    #[serde(default)]
+    inputs: Vec<String>,
+
+    #[serde(default)]
+    input_list: Option<String>,
+
+    #[serde(default)]
+    outputs: Vec<String>,
+
+    #[serde(default)]
+    output_list: Option<String>,
 }
 
 /// Executable job with dependencies resolved and all variables applied
@@ -30,6 +43,8 @@ pub struct InnerJobRealization {
     name: String,
     run: String,
     dependencies: Vec<JobRealization>,
+    inputs: Vec<String>,
+    outputs: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -103,17 +118,42 @@ impl JobDescription {
             }
         }
 
+        let mut inputs = Vec::new();
+        for input in &self.inputs {
+            inputs.push(handlebars.render_template(input, &combined_vars)?);
+        }
+        if let Some(input_str) = &self.input_list {
+            let rendered_input_str = handlebars.render_template(input_str, &combined_vars)?;
+            let additional_inputs = rendered_input_str .split(char::is_whitespace).map(|s| s.to_owned());
+            inputs.extend(additional_inputs)
+        }
+        let mut outputs = Vec::new();
+        for output in &self.outputs {
+            outputs.push(handlebars.render_template(output, &combined_vars)?);
+        }
+        if let Some(output_str) = &self.output_list {
+            let rendered_output_str = handlebars.render_template(output_str, &combined_vars)?;
+            let additional_outputs = rendered_output_str .split(char::is_whitespace).map(|s| s.to_owned());
+            outputs.extend(additional_outputs)
+        }
+
         let run = handlebars.render_template(&self.run, &combined_vars)?;
         let name = name.replace('\n', "");
 
         Ok(Arc::new(InnerJobRealization {
-            name, run, dependencies,
+            name, run, dependencies, inputs, outputs,
         }))
     }
 }
 
 impl InnerJobRealization {
     pub fn run(&self, status_writer: &mut impl Write, log_writer: &mut impl Write, verbose: bool) -> ZinnResult<String> {
+        for file in &self.inputs {
+            if !Path::new(file).exists() {
+                return Err(ZinnError::InputFileError(file.to_owned()));
+            }
+        }
+
         let (io_reader, io_writer) = os_pipe::pipe()?;
 
         let mut process = Command::new("sh")
@@ -148,9 +188,14 @@ impl InnerJobRealization {
             let _ = write!(log_writer, "{}", format!("{}: {}", self.name, line));
         }
 
-        assert!(!self.name.contains('\n'));
-
         let status = process.wait()?;
+
+        for file in &self.outputs {
+            if !Path::new(file).exists() {
+                return Err(ZinnError::OutputFileError(file.to_owned()));
+            }
+        }
+
         if !status.success() {
             Err(ZinnError::Child())
         } else {
