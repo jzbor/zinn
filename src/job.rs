@@ -53,9 +53,12 @@ impl JobDescription {
 
 impl InnerJobRealization {
     pub fn run(&self, status_writer: &mut impl Write, log_writer: &mut impl Write, verbose: bool) -> ZinnResult<String> {
+        let (mut io_reader, io_writer) = os_pipe::pipe()?;
+
         let mut process = Command::new("sh")
             .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
+            .stdout(io_writer.try_clone()?)
+            .stderr(io_writer)
             .spawn()?;
 
 
@@ -67,14 +70,10 @@ impl InnerJobRealization {
         drop(writer);
         drop(stdin);
 
-        let stdout = process.stdout.take()
-            .ok_or_else(ZinnError::ShellStdout)?;
-        let reader = BufReader::new(stdout);
         let output = String::new();
-
         let mut last_line: Option<String> = None;
 
-        for line in reader.lines().flatten() {
+        for line in BufReader::new(io_reader).lines().flatten() {
             let _ = write!(status_writer, "{}", line);
 
             if verbose {
