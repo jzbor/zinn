@@ -68,7 +68,10 @@ fn main() {
     main_bar.enable_steady_tick(Duration::new(0, 200000));
 
     for (name, job) in &zinnfile.jobs {
-        let job = job.realize(name);
+        let job = resolve(job.realize(name, &zinnfile.jobs));
+        for dep in job.transitive_dependencies() {
+            queue.enqueue(dep);
+        }
         queue.enqueue(job);
     }
 

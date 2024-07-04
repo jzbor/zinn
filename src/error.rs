@@ -6,20 +6,23 @@ pub type ZinnResult<T> = Result<T, ZinnError>;
 
 #[derive(Error, Debug)]
 pub enum ZinnError {
-    #[error("File Error: {0}")]
+    #[error("File Error - {0}")]
     File(#[from] io::Error),
 
-    #[error("YAML Parsing Error: {0}")]
-    YAML(#[from] serde_yaml::Error),
+    #[error("YAML Parsing Error - {0}")]
+    Yaml(#[from] serde_yaml::Error),
 
-    #[error("Shell Error: unable to open stdin")]
+    #[error("Unable to open stdin")]
     ShellStdin(),
 
-    #[error("Shell Error: unable to open stdout")]
+    #[error("Unable to open stdout")]
     ShellStdout(),
 
-    #[error("Child Error: Child exited unsuccessfully")]
+    #[error("Child exited unsuccessfully")]
     Child(),
+
+    #[error("Dependency not found ({0})")]
+    DependencyNotFound(String),
 }
 
 pub fn die(e: impl Into<ZinnError>) -> ! {

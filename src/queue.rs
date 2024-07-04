@@ -61,11 +61,13 @@ impl Queue {
     pub fn finished(&self, finished_job: JobRealization) {
         let mut inner = self.inner.lock().unwrap();
         inner.states.insert(finished_job, JobState::Finished);
+        self.cond_fetch_job.notify_all();
     }
 
     pub fn failed(&self, failed_job: JobRealization) {
         let mut inner = self.inner.lock().unwrap();
         inner.states.insert(failed_job, JobState::Failed);
+        self.cond_fetch_job.notify_all();
     }
 
     pub fn done(&self) {
@@ -75,23 +77,36 @@ impl Queue {
 }
 
 impl InnerQueue {
+    fn dependencies_satisfied(&self, job: JobRealization) -> bool {
+        for dep in job.dependencies() {
+            if self.states.get(&dep) != Some(JobState::Finished).as_ref() {
+                return false;
+            }
+        }
+
+        true
+    }
+
     fn get_ready(&mut self) -> Option<JobRealization> {
         let mut ret = None;
         for job in &self.jobs {
-            if *self.states.get(job).unwrap() == JobState::Ready {
+            if *self.states.get(job).unwrap() == JobState::Ready
+                && self.dependencies_satisfied(job.clone()) {
+
                 ret = Some(job.clone())
             }
         }
 
         if let Some(job) = &ret {
             self.states.insert(job.clone(), JobState::Running);
+            self.jobs.retain(|j| j != job)
         }
 
         ret
     }
 
     fn all_tasks_distributed(&self) -> bool {
-        for (_, state) in &self.states {
+        for state in self.states.values() {
             if *state != JobState::Finished
                     && *state != JobState::Running
                     && *state != JobState::Failed {

@@ -16,7 +16,7 @@ impl Write for BarMessageWriter {
 
 impl Write for BarPrintWriter {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        self.0.println(s.to_owned());
+        self.0.println(s);
         Ok(())
     }
 }
