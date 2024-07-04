@@ -1,0 +1,40 @@
+constants:
+  CC: gcc
+  CFLAGS:
+  BIN: "cproj"
+  SOURCES: "{{joinlines (shell 'find . -name \"*.c\"')}}"
+jobs:
+  object:
+    args: [path]
+    run: |
+      echo "compiling."
+      sleep 1
+      echo "compiling.."
+      sleep 1
+      echo "compiling..."
+      sleep 1
+      {{CC}} {{CFLAGS}} -c {{path}}
+
+  binary:
+    requires:
+      - job: object
+        with_list:
+          param: path
+          inputs: "{{SOURCES}}"
+    run: |
+      echo "linking."
+      sleep 1
+      echo "linking.."
+      sleep 1
+      echo "linking..."
+      sleep 1
+      {{CC}} {{CFLAGS}} -o {{BIN}} {{subst SOURCES '.c' '.o'}}
+
+  clean:
+    run: |
+      rm -rf *.o
+      rm -rf {{BIN}}
+
+  default:
+    requires:
+      - job: binary
