@@ -161,6 +161,10 @@ impl JobDescription {
             name, run, dependencies, inputs, outputs, param_values,
         }))
     }
+
+    pub fn args(&self) -> &Vec<String> {
+        &self.args
+    }
 }
 
 impl InnerJobRealization {

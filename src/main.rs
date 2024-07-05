@@ -52,6 +52,10 @@ struct Args {
     /// Open documentation in the browser
     #[clap(long)]
     docs: bool,
+
+    /// List all jobs with their parameters
+    #[clap(long)]
+    list: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -108,6 +112,18 @@ fn main() {
     // read zinnfile
     let contents = resolve(fs::read_to_string(&args.file));
     let zinnfile: Zinnfile = resolve(serde_yaml::from_str(&contents));
+
+    // --list
+    if args.list {
+        for (name, job) in zinnfile.jobs {
+            print!("{}", name);
+            if !job.args().is_empty() {
+                print!(" ({})", job.args().join(", "));
+            }
+            println!();
+        }
+        return;
+    }
 
 
     // init template engine
