@@ -18,6 +18,7 @@ mod job;
 mod worker;
 mod queue;
 mod hbextensions;
+mod constants;
 
 
 #[derive(Parser)]
@@ -49,7 +50,8 @@ struct Options {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Zinnfile {
     #[serde(default)]
-    constants: HashMap<String, String>,
+    #[serde(deserialize_with = "constants::parse")]
+    constants: Vec<(String, String)>,
 
     jobs: HashMap<String, JobDescription>,
 }
@@ -74,6 +76,12 @@ fn main() {
     handlebars.set_strict_mode(true);
     hbextensions::register_helpers(&mut handlebars);
 
+    let mut constants = HashMap::new();
+    for (name, value) in &zinnfile.constants {
+        let realized = resolve(handlebars.render_template(value, &constants));
+        constants.insert(name.to_owned(), realized);
+    }
+
     let mp = MultiProgress::new();
     let main_bar_style = ProgressStyle::with_template("[{elapsed}] {wide_bar} {pos}/{len}").unwrap();
     let main_bar = ProgressBar::new(zinnfile.jobs.len() as u64);
@@ -81,7 +89,7 @@ fn main() {
 
     for name in &args.targets {
         let job = match zinnfile.jobs.get(name) {
-            Some(job) => resolve(job.realize(&name, &zinnfile.jobs, &handlebars, &zinnfile.constants, &HashMap::new())),
+            Some(job) => resolve(job.realize(&name, &zinnfile.jobs, &handlebars, &constants, &HashMap::new())),
             None => resolve(Err(ZinnError::JobNotFound(name.to_owned()))),
         };
         for dep in job.transitive_dependencies() {

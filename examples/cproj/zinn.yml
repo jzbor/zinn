@@ -2,8 +2,9 @@ constants:
   CC: gcc
   CFLAGS:
   BIN: "cproj"
-  SOURCES: "{{joinlines (shell 'find . -name \"*.c\"')}}"
   BUILDDIR: build
+  SOURCES: "{{joinlines (shell 'find . -name \"*.c\"')}}"
+  OBJECTS: "{{re SOURCES '([^\\\\s ]*).c' (cat BUILDDIR '/' '$1.o')}}"
 jobs:
   builddir:
     outputs: ["{{BUILDDIR}}"]
@@ -31,7 +32,7 @@ jobs:
           param: path
           inputs: "{{SOURCES}}"
       - job: builddir
-    input_list: "{{re SOURCES '([^\\\\s]*).c' (cat BUILDDIR '/' '$1.o')}}"
+    input_list: "{{OBJECTS}}"
     output_list: "{{BUILDDIR}}/{{BIN}}"
     run: |
       echo "linking."
@@ -40,7 +41,7 @@ jobs:
       sleep 1
       echo "linking..."
       sleep 1
-      {{CC}} {{CFLAGS}} -o "{{BUILDDIR}}/{{BIN}}" {{re SOURCES '([^\\\\s ]*).c' (cat BUILDDIR '/' '$1.o')}}
+      {{CC}} {{CFLAGS}} -o "{{BUILDDIR}}/{{BIN}}" {{OBJECTS}}
 
   clean:
     run: |
