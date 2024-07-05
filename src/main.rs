@@ -30,19 +30,19 @@ struct Args {
     #[clap(short, long, default_value_t = String::from("zinn.yaml"))]
     file: String,
 
-    /// Target jobs to execute as entry points
+    /// target jobs to execute as entry points
     #[clap(default_values_t = [String::from("default")])]
     targets: Vec<String>,
 
-    /// Number of jobs to run in parallel
+    /// number of jobs to run in parallel
     #[clap(short, long)]
     jobs: Option<usize>,
 
-    /// Print output of jobs
+    /// print output of jobs
     #[clap(short, long)]
     verbose: bool,
 
-    /// Force rebuild all files
+    /// force rebuild all files
     #[clap(short = 'B', long)]
     force_rebuild: bool,
 }
@@ -56,10 +56,16 @@ struct Options {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Zinnfile {
+    /// Constants to pass to the jobs
+    ///
+    /// All constants are rendered, with all previous constants being available.
     #[serde(default)]
     #[serde(deserialize_with = "constants::parse")]
     constants: Vec<(String, String)>,
 
+    /// Descriptions of the jobs
+    ///
+    /// See also [`JobDescription`].
     jobs: HashMap<String, JobDescription>,
 }
 

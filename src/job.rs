@@ -17,24 +17,33 @@ use crate::Options;
 /// Template for a job as described in the Zinnfile
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct JobDescription {
+    /// The shell commands to run for this job
     #[serde(default)]
     run: String,
 
+    /// Dependencies of the job
+    ///
+    /// See also [`JobDependency`].
     #[serde(default)]
     requires: Vec<JobDependency>,
 
+    /// Argument declarations
     #[serde(default)]
     args: Vec<String>,
 
+    /// Input files as space-separated list
     #[serde(default)]
     inputs: Option<String>,
 
+    /// Input files as native list
     #[serde(default)]
     input_list: Vec<String>,
 
+    /// Output files as space-separated list
     #[serde(default)]
     outputs: Option<String>,
 
+    /// Output files as native list
     #[serde(default)]
     output_list: Vec<String>,
 }
@@ -52,19 +61,24 @@ pub struct InnerJobRealization {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct JobDependency {
+    /// Name of the dependency job
     job: String,
 
+    /// Arguments to pass to the dependency job
     #[serde(default)]
     with: HashMap<String, String>,
 
+    /// Feed an argument by iterating over a space-separated list
     #[serde(default)]
     with_list: Option<WithList>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WithList {
+    /// Parameter name
     param: String,
 
+    /// List of input values (space-separated)
     #[serde(default)]
     inputs: String,
 }
