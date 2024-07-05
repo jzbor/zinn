@@ -27,16 +27,16 @@ pub struct JobDescription {
     args: Vec<String>,
 
     #[serde(default)]
-    inputs: Vec<String>,
+    inputs: Option<String>,
 
     #[serde(default)]
-    input_list: Option<String>,
+    input_list: Vec<String>,
 
     #[serde(default)]
-    outputs: Vec<String>,
+    outputs: Option<String>,
 
     #[serde(default)]
-    output_list: Option<String>,
+    output_list: Vec<String>,
 }
 
 /// Executable job with dependencies resolved and all variables applied
@@ -122,22 +122,22 @@ impl JobDescription {
         }
 
         let mut inputs = Vec::new();
-        for input in &self.inputs {
-            inputs.push(handlebars.render_template(input, &combined_vars)?);
-        }
-        if let Some(input_str) = &self.input_list {
+        if let Some(input_str) = &self.inputs {
             let rendered_input_str = handlebars.render_template(input_str, &combined_vars)?;
             let additional_inputs = rendered_input_str .split(char::is_whitespace).map(|s| s.to_owned());
             inputs.extend(additional_inputs)
         }
-        let mut outputs = Vec::new();
-        for output in &self.outputs {
-            outputs.push(handlebars.render_template(output, &combined_vars)?);
+        for input in &self.input_list {
+            inputs.push(handlebars.render_template(input, &combined_vars)?);
         }
-        if let Some(output_str) = &self.output_list {
+        let mut outputs = Vec::new();
+        if let Some(output_str) = &self.outputs {
             let rendered_output_str = handlebars.render_template(output_str, &combined_vars)?;
             let additional_outputs = rendered_output_str .split(char::is_whitespace).map(|s| s.to_owned());
             outputs.extend(additional_outputs)
+        }
+        for output in &self.output_list {
+            outputs.push(handlebars.render_template(output, &combined_vars)?);
         }
 
         let run = handlebars.render_template(&self.run, &combined_vars)?;

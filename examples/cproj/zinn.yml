@@ -7,15 +7,15 @@ constants:
   OBJECTS: "{{re SOURCES '([^\\\\s ]*).c' (cat BUILDDIR '/' '$1.o')}}"
 jobs:
   builddir:
-    outputs: ["{{BUILDDIR}}"]
+    outputs: "{{BUILDDIR}}"
     run: mkdir -vp {{BUILDDIR}}
 
   object:
     args: [path]
     requires:
       - job: builddir
-    inputs: ["{{path}}"]
-    outputs: ["{{BUILDDIR}}/{{subst path '.c' '.o'}}"]
+    inputs: "{{path}}"
+    outputs: "{{BUILDDIR}}/{{subst path '.c' '.o'}}"
     run: |
       echo "compiling."
       sleep 1
@@ -32,8 +32,8 @@ jobs:
           param: path
           inputs: "{{SOURCES}}"
       - job: builddir
-    input_list: "{{OBJECTS}}"
-    output_list: "{{BUILDDIR}}/{{BIN}}"
+    inputs: "{{OBJECTS}}"
+    outputs: "{{BUILDDIR}}/{{BIN}}"
     run: |
       echo "linking."
       sleep 1
