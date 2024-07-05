@@ -168,7 +168,15 @@ impl JobDescription {
 }
 
 impl InnerJobRealization {
-    pub fn run(&self, status_writer: &mut impl Write, log_writer: &mut impl Write, args: &Options) -> ZinnResult<String> {
+    pub fn run(&self, status_writer: &mut impl Write, log_writer: &mut impl Write, options: &Options) -> ZinnResult<String> {
+        // skip if dry run
+        if options.dry_run {
+            if options.trace {
+                let _ = writeln!(log_writer, "{}", self.cmd());
+            }
+            return Ok(String::from("(dry run)"));
+        }
+
         // check if all input files exist
         for file in &self.inputs {
             if !Path::new(file).exists() {
@@ -177,7 +185,7 @@ impl InnerJobRealization {
         }
 
         // check if any input file is newer than any output file
-        if !args.force && !self.inputs.is_empty() && !self.outputs.is_empty() {
+        if !options.force && !self.inputs.is_empty() && !self.outputs.is_empty() {
             let mut dirty = false;
             for output in &self.outputs {
                 if !Path::new(output).exists() {
@@ -197,6 +205,11 @@ impl InnerJobRealization {
             if !dirty {
                 return Ok(String::from("Nothing to do"));
             }
+        }
+
+        // print out trace
+        if options.trace {
+            let _ = writeln!(log_writer, "{}", self.cmd());
         }
 
         let (io_reader, io_writer) = os_pipe::pipe()?;
@@ -222,7 +235,7 @@ impl InnerJobRealization {
         for line in BufReader::new(io_reader).lines().map_while(Result::ok) {
             let _ = writeln!(status_writer, "{}", line);
 
-            if args.verbose {
+            if options.verbose {
                 if let Some(line) = last_line.take() {
                     let _ = writeln!(log_writer, "{}: {}", self, line);
                 }
@@ -260,6 +273,10 @@ impl InnerJobRealization {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn cmd(&self) -> &str {
+        &self.run
     }
 }
 

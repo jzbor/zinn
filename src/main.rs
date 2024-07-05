@@ -56,12 +56,22 @@ struct Args {
     /// List all jobs with their parameters
     #[clap(long)]
     list: bool,
+
+    /// Output commands before executing
+    #[clap(short, long)]
+    trace: bool,
+
+    /// Don't actually execute the commands
+    #[clap(long)]
+    dry_run: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Options {
     verbose: bool,
     force: bool,
+    trace: bool,
+    dry_run: bool,
 }
 
 
@@ -85,6 +95,8 @@ impl Args {
         Options {
             verbose: self.verbose,
             force: self.force_rebuild,
+            trace: self.trace,
+            dry_run: self.dry_run,
         }
     }
 }
