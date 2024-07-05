@@ -89,7 +89,7 @@ fn main() {
 
     for name in &args.targets {
         let job = match zinnfile.jobs.get(name) {
-            Some(job) => resolve(job.realize(&name, &zinnfile.jobs, &handlebars, &constants, &HashMap::new())),
+            Some(job) => resolve(job.realize(name, &zinnfile.jobs, &handlebars, &constants, &HashMap::new())),
             None => resolve(Err(ZinnError::JobNotFound(name.to_owned()))),
         };
         for dep in job.transitive_dependencies() {

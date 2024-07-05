@@ -159,7 +159,7 @@ impl InnerJobRealization {
         }
 
         // check if any input file is newer than any output file
-        if !args.force && self.inputs.len() != 0 && self.outputs.len() != 0 {
+        if !args.force && !self.inputs.is_empty() && !self.outputs.is_empty() {
             let mut dirty = false;
             for output in &self.outputs {
                 if !Path::new(output).exists() {
