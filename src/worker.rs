@@ -5,27 +5,51 @@ use indicatif::ProgressBar;
 use crate::queue::Queue;
 use crate::Options;
 
-struct BarMessageWriter(ProgressBar);
-struct BarPrintWriter(ProgressBar);
+struct BarMessageWriter(String, ProgressBar);
+struct BarPrintWriter(String, ProgressBar);
 
 impl Write for BarMessageWriter {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        self.0.set_message(s.to_owned());
+        for c in s.chars() {
+            self.write_char(c)?
+        }
+        Ok(())
+    }
+
+    fn write_char(&mut self, c: char) -> std::fmt::Result {
+        if c == '\n' {
+            let msg = self.0.clone();
+            self.1.set_message(msg);
+            self.0 = String::new();
+        } else {
+            self.0.push(c);
+        }
         Ok(())
     }
 }
 
 impl Write for BarPrintWriter {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        self.0.println(s);
+        for c in s.chars() {
+            self.write_char(c)?
+        }
+        Ok(())
+    }
+
+    fn write_char(&mut self, c: char) -> std::fmt::Result {
+        if c == '\n' {
+            self.1.println(&self.0);
+            self.0.clear();
+        } else {
+            self.0.push(c)
+        }
         Ok(())
     }
 }
 
-
 pub fn run_worker(queue: Queue, bar: ProgressBar, main_bar: ProgressBar, options: Options) {
-    let mut status_writer = BarMessageWriter(bar.clone());
-    let mut log_writer = BarPrintWriter(bar.clone());
+    let mut status_writer = BarMessageWriter(String::new(), bar.clone());
+    let mut log_writer = BarPrintWriter(String::new(), bar.clone());
 
     loop {
         bar.set_prefix("waiting...");

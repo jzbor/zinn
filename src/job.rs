@@ -201,17 +201,17 @@ impl InnerJobRealization {
         let mut last_line: Option<String> = None;
 
         for line in BufReader::new(io_reader).lines().map_while(Result::ok) {
-            let _ = write!(status_writer, "{}", line);
+            let _ = writeln!(status_writer, "{}", line);
 
             if args.verbose {
                 if let Some(line) = last_line.take() {
-                    let _ = write!(log_writer, "{}", format!("{}: {}", self.name, line));
+                    let _ = writeln!(log_writer, "{}: {}", self.name, line);
                 }
                 last_line = Some(line);
             }
         }
         if let Some(line) = last_line.take() {
-            let _ = write!(log_writer, "{}", format!("{}: {}", self.name, line));
+            let _ = writeln!(log_writer, "{}: {}", self.name, line);
         }
 
         let status = process.wait()?;
