@@ -60,7 +60,7 @@ pub fn run_worker(queue: Queue, bar: ProgressBar, main_bar: ProgressBar, options
                 bar.println(console::style(format!("=> FAILED {}: {}", job, e)).red().to_string());
                 queue.failed(job);
             } else {
-                bar.println(console::style(format!("=> DONE {}", job)).cyan().to_string());
+                bar.println(console::style(format!("=> DONE {}", job)).green().to_string());
                 queue.finished(job);
             }
             main_bar.inc(1);
