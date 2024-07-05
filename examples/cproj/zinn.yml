@@ -3,11 +3,18 @@ constants:
   CFLAGS:
   BIN: "cproj"
   SOURCES: "{{joinlines (shell 'find . -name \"*.c\"')}}"
+  BUILDDIR: build
 jobs:
+  builddir:
+    outputs: ["{{BUILDDIR}}"]
+    run: mkdir -vp {{BUILDDIR}}
+
   object:
     args: [path]
+    requires:
+      - job: builddir
     inputs: ["{{path}}"]
-    outputs: ["{{subst path '.c' '.o'}}"]
+    outputs: ["{{BUILDDIR}}/{{subst path '.c' '.o'}}"]
     run: |
       echo "compiling."
       sleep 1
@@ -15,7 +22,7 @@ jobs:
       sleep 1
       echo "compiling..."
       sleep 1
-      {{CC}} {{CFLAGS}} -c {{path}}
+      {{CC}} {{CFLAGS}} -c {{path}} -o "{{BUILDDIR}}/{{subst path '.c' '.o'}}"
 
   binary:
     requires:
@@ -23,8 +30,9 @@ jobs:
         with_list:
           param: path
           inputs: "{{SOURCES}}"
-    input_list: "{{subst SOURCES '.c' '.o'}}"
-    output_list: "{{BIN}}"
+      - job: builddir
+    input_list: "{{re SOURCES '([^\\\\s]*).c' (cat BUILDDIR '/' '$1.o')}}"
+    output_list: "{{BUILDDIR}}/{{BIN}}"
     run: |
       echo "linking."
       sleep 1
@@ -32,7 +40,7 @@ jobs:
       sleep 1
       echo "linking..."
       sleep 1
-      {{CC}} {{CFLAGS}} -o {{BIN}} {{subst SOURCES '.c' '.o'}}
+      {{CC}} {{CFLAGS}} -o "{{BUILDDIR}}/{{BIN}}" {{re SOURCES '([^\\\\s ]*).c' (cat BUILDDIR '/' '$1.o')}}
 
   clean:
     run: |

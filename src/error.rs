@@ -35,6 +35,10 @@ pub enum ZinnError {
 
     #[error("Missing output file \"{0}\"")]
     OutputFileError(String),
+
+    #[cfg(feature = "regex")]
+    #[error("Unable to parse regex - {0}")]
+    RegexError(#[from] regex::Error),
 }
 
 pub fn die(e: impl Into<ZinnError>) -> ! {
