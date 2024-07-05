@@ -1,6 +1,6 @@
 constants:
   CC: gcc
-  CFLAGS:
+  CFLAGS: -std=c11 -pedantic -Wall -Werror -D_XOPEN_SOURCE=700
   BIN: "cproj"
   BUILDDIR: build
   SOURCES: "{{joinlines (shell 'find . -name \"*.c\"')}}"

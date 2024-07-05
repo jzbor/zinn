@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 use clap::Parser;
 use handlebars::Handlebars;
 use queue::Queue;
@@ -24,20 +26,25 @@ mod constants;
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    #[clap(short, long, default_value_t = String::from("zinn.yml"))]
-    zinnfile: String,
+    /// Zinnfile to run
+    #[clap(short, long, default_value_t = String::from("zinn.yaml"))]
+    file: String,
 
+    /// Target jobs to execute as entry points
     #[clap(default_values_t = [String::from("default")])]
     targets: Vec<String>,
 
+    /// Number of jobs to run in parallel
     #[clap(short, long, default_value_t = 4)]
     jobs: usize,
 
+    /// Print output of jobs
     #[clap(short, long)]
     verbose: bool,
 
-    #[clap(short, long)]
-    force: bool,
+    /// Force rebuild all files
+    #[clap(short = 'B', long)]
+    force_rebuild: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -60,7 +67,7 @@ impl Args {
     fn options(&self) -> Options {
         Options {
             verbose: self.verbose,
-            force: self.force,
+            force: self.force_rebuild,
         }
     }
 }
@@ -68,12 +75,13 @@ impl Args {
 fn main() {
     let args = Args::parse();
 
-    let contents = resolve(fs::read_to_string(&args.zinnfile));
+    let contents = resolve(fs::read_to_string(&args.file));
     let zinnfile: Zinnfile = resolve(serde_yaml::from_str(&contents));
     let queue = Queue::new();
 
     let mut handlebars = Handlebars::new();
     handlebars.set_strict_mode(true);
+    handlebars.register_escape_fn(handlebars::no_escape);
     hbextensions::register_helpers(&mut handlebars);
 
     let mut constants = HashMap::new();
