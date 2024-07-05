@@ -35,8 +35,8 @@ struct Args {
     targets: Vec<String>,
 
     /// Number of jobs to run in parallel
-    #[clap(short, long, default_value_t = 4)]
-    jobs: usize,
+    #[clap(short, long)]
+    jobs: Option<usize>,
 
     /// Print output of jobs
     #[clap(short, long)]
@@ -74,27 +74,46 @@ impl Args {
 
 fn main() {
     let args = Args::parse();
+    let nthreads = if let Some(nthreads) = args.jobs {
+        nthreads
+    } else if let Ok(nthreads) = thread::available_parallelism() {
+        nthreads.into()
+    } else { 4 };
 
+    // read zinnfile
     let contents = resolve(fs::read_to_string(&args.file));
     let zinnfile: Zinnfile = resolve(serde_yaml::from_str(&contents));
-    let queue = Queue::new();
 
+
+    // init template engine
     let mut handlebars = Handlebars::new();
     handlebars.set_strict_mode(true);
     handlebars.register_escape_fn(handlebars::no_escape);
     hbextensions::register_helpers(&mut handlebars);
 
+    // parse constants
     let mut constants = HashMap::new();
     for (name, value) in &zinnfile.constants {
         let realized = resolve(handlebars.render_template(value, &constants));
         constants.insert(name.to_owned(), realized);
     }
 
+    // setup bars
     let mp = MultiProgress::new();
     let main_bar_style = ProgressStyle::with_template("[{elapsed}] {wide_bar} {pos}/{len}").unwrap();
     let main_bar = ProgressBar::new(zinnfile.jobs.len() as u64);
     main_bar.set_style(main_bar_style);
+    let mut bars: Vec<_> = (0..nthreads).map(|_| {
+        let bar = ProgressBar::new(10000000);
+        bar.set_style(ProgressStyle::with_template("{spinner} {prefix:.cyan} {wide_msg}").unwrap());
+        mp.add(bar.clone());
+        bar.tick();
+        bar.enable_steady_tick(Duration::from_millis(75));
+        bar
+    }).collect();
 
+    // feed the queue
+    let queue = Queue::new();
     for name in &args.targets {
         let job = match zinnfile.jobs.get(name) {
             Some(job) => resolve(job.realize(name, &zinnfile.jobs, &handlebars, &constants, &HashMap::new())),
@@ -106,18 +125,10 @@ fn main() {
         queue.enqueue(job);
     }
 
-    let mut bars: Vec<_> = (0..args.jobs).map(|_| {
-        let bar = ProgressBar::new(10000000);
-        bar.set_style(ProgressStyle::with_template("{spinner} {prefix:.cyan} {wide_msg}").unwrap());
-        mp.add(bar.clone());
-        bar.tick();
-        bar.enable_steady_tick(Duration::from_millis(75));
-        bar
-    }).collect();
-
     main_bar.set_length(queue.len() as u64);
 
-    let threads: Vec<_> = (0..args.jobs).map(|_| {
+    // start the threads
+    let threads: Vec<_> = (0..nthreads).map(|_| {
         let main_bar = main_bar.clone();
         let queue = queue.clone();
         let bar = bars.pop().unwrap();
@@ -128,10 +139,11 @@ fn main() {
         })
     }).collect();
 
+    // enable the main bar
     mp.add(main_bar.clone());
     main_bar.enable_steady_tick(Duration::from_millis(75));
 
-
+    // wait for the work to be completed
     queue.done();
     for thread in threads {
         let _ = thread.join();
