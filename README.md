@@ -26,14 +26,14 @@ jobs:
   binary:
     requires:
       - job: object
-      	with:
-	  path: math.c
+        with:
+    path: math.c
       - job: object
-      	with:
-	  path: output.c
+        with:
+    path: output.c
       - job: object
-      	with:
-	  path: main.c
+        with:
+    path: main.c
     inputs: math.c output.c main.c
     outputs: program
     run: {{CC}} {{CFLAGS}} -o program
