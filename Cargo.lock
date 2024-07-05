@@ -617,6 +617,7 @@ name = "zinn"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "console",
  "handlebars",
  "indicatif",
  "os_pipe",

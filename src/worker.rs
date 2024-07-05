@@ -55,12 +55,12 @@ pub fn run_worker(queue: Queue, bar: ProgressBar, main_bar: ProgressBar, options
         bar.set_prefix("waiting...");
         bar.set_message("");
         if let Some(job) = queue.fetch() {
-            bar.set_prefix(job.name().to_owned());
+            bar.set_prefix(job.to_string());
             if let Err(e) = job.run(&mut status_writer, &mut log_writer, &options) {
-                bar.println(format!("[FAILED] {}: {}", job.name(), e));
+                bar.println(console::style(format!("=> FAILED {}: {}", job, e)).red().to_string());
                 queue.failed(job);
             } else {
-                bar.println(format!("[DONE] {}", job.name()));
+                bar.println(console::style(format!("=> DONE {}", job)).cyan().to_string());
                 queue.finished(job);
             }
             main_bar.inc(1);

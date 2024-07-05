@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::fmt::Write;
+use std::fmt::{self, Write};
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -44,6 +44,7 @@ pub struct JobDescription {
 pub struct InnerJobRealization {
     name: String,
     run: String,
+    param_values: Vec<String>,  // for info/debugging purposes
     dependencies: Vec<JobRealization>,
     inputs: Vec<String>,
     outputs: Vec<String>,
@@ -75,7 +76,8 @@ impl JobDescription {
     /// Resolve templates and dependencies
     pub fn realize(&self, name: &str, job_descriptions: &HashMap<String, JobDescription>, handlebars: &Handlebars, constants: &HashMap<String, String>, parameters: &HashMap<String, String>) -> ZinnResult<JobRealization> {
         let mut dependencies = Vec::new();
-        let mut name = name.to_owned();
+        let mut param_values = Vec::new();
+        let name = name.to_owned();
 
         let mut combined_vars = HashMap::new();
         for (name, value) in constants {
@@ -86,8 +88,7 @@ impl JobDescription {
             match parameters.get(arg) {
                 Some(val) => {
                     combined_vars.insert(arg.to_owned(), val.to_owned());
-                    name.push(' ');
-                    name.push_str(val);
+                    param_values.push(val.to_owned());
                 },
                 None => return Err(ZinnError::MissingArgument(arg.to_owned())),
             }
@@ -143,7 +144,7 @@ impl JobDescription {
         let name = name.replace('\n', "");
 
         Ok(Arc::new(InnerJobRealization {
-            name, run, dependencies, inputs, outputs,
+            name, run, dependencies, inputs, outputs, param_values,
         }))
     }
 }
@@ -205,13 +206,13 @@ impl InnerJobRealization {
 
             if args.verbose {
                 if let Some(line) = last_line.take() {
-                    let _ = writeln!(log_writer, "{}: {}", self.name, line);
+                    let _ = writeln!(log_writer, "{}: {}", self, line);
                 }
                 last_line = Some(line);
             }
         }
         if let Some(line) = last_line.take() {
-            let _ = writeln!(log_writer, "{}: {}", self.name, line);
+            let _ = writeln!(log_writer, "{}: {}", self, line);
         }
 
         let status = process.wait()?;
@@ -244,3 +245,13 @@ impl InnerJobRealization {
     }
 }
 
+
+impl fmt::Display for InnerJobRealization {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}]", self.name())?;
+        if !self.param_values.is_empty() {
+            write!(f, " {}", self.param_values.join(" "))?
+        }
+        Ok(())
+    }
+}
