@@ -23,6 +23,9 @@ mod hbextensions;
 mod constants;
 
 
+const DOCS_URL: &str = "https://jzbor.de/zinn/zinn";
+
+
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
@@ -30,21 +33,25 @@ struct Args {
     #[clap(short, long, default_value_t = String::from("zinn.yaml"))]
     file: String,
 
-    /// target jobs to execute as entry points
+    /// Target jobs to execute as entry points
     #[clap(default_values_t = [String::from("default")])]
     targets: Vec<String>,
 
-    /// number of jobs to run in parallel
+    /// Number of jobs to run in parallel
     #[clap(short, long)]
     jobs: Option<usize>,
 
-    /// print output of jobs
+    /// Print output of jobs
     #[clap(short, long)]
     verbose: bool,
 
-    /// force rebuild all files
+    /// Force rebuild all files
     #[clap(short = 'B', long)]
     force_rebuild: bool,
+
+    /// Open documentation in the browser
+    #[clap(long)]
+    docs: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -80,6 +87,18 @@ impl Args {
 
 fn main() {
     let args = Args::parse();
+
+    // process arguments
+    if args.docs {
+        let result = std::process::Command::new("xdg-open")
+            .arg(DOCS_URL)
+            .spawn();
+        match result {
+            Ok(_) => (),
+            Err(e) => { eprintln!("Error: {}", e); std::process::exit(1); }
+        }
+        return;
+    }
     let nthreads = if let Some(nthreads) = args.jobs {
         nthreads
     } else if let Ok(nthreads) = thread::available_parallelism() {
