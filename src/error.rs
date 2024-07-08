@@ -12,8 +12,11 @@ pub enum ZinnError {
     #[error("{0}")]
     Yaml(#[from] serde_yaml::Error),
 
-    #[error("Child exited unsuccessfully")]
-    Child(),
+    #[error("Child exited with error {0}")]
+    ChildFailed(i32),
+
+    #[error("Child terminated by signal")]
+    ChildSignaled(),
 
     #[error("Dependency not found ({0})")]
     DependencyNotFound(String),

@@ -218,10 +218,10 @@ impl InnerJobRealization {
         }
 
         let (io_reader, io_writer) = os_pipe::pipe()?;
-
+        let cmd_with_exit_setting = format!("set -e; {}", self.run);
         let mut process = Command::new("sh")
             .arg("-c")
-            .arg(&self.run)
+            .arg(cmd_with_exit_setting)
             .stdout(io_writer.try_clone()?)
             .stderr(io_writer)
             .spawn()?;
@@ -252,7 +252,10 @@ impl InnerJobRealization {
         }
 
         if !status.success() {
-            Err(ZinnError::Child())
+            match status.code() {
+                Some(code) => Err(ZinnError::ChildFailed(code)),
+                None => Err(ZinnError::ChildSignaled()),
+            }
         } else {
             Ok(JobState::Finished)
         }
