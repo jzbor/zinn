@@ -31,6 +31,10 @@ pub struct JobDescription {
     #[serde(default)]
     args: Vec<String>,
 
+    /// Argument defaults
+    #[serde(default)]
+    defaults: HashMap<String, String>,
+
     /// Input files as space-separated list
     #[serde(default)]
     inputs: Option<String>,
@@ -99,7 +103,7 @@ impl JobDescription {
         }
 
         for arg in &self.args {
-            match parameters.get(arg) {
+            match parameters.get(arg).or(self.defaults.get(arg)) {
                 Some(val) => {
                     combined_vars.insert(arg.to_owned(), val.to_owned());
                     param_values.push(val.to_owned());
