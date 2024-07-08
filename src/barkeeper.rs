@@ -1,4 +1,4 @@
-use std::{fmt::Write, time::Duration};
+use std::fmt::Write;
 
 
 #[cfg(feature = "progress")]
@@ -75,7 +75,7 @@ impl StateTracker for Barkeeper {
     fn start(&self) {
         self.mp.add(self.bar.clone());
         self.bar.tick();
-        self.bar.enable_steady_tick(Duration::from_millis(75));
+        self.bar.enable_steady_tick(std::time::Duration::from_millis(75));
     }
 
     fn for_threads(&self, nthreads: usize) -> Vec<ThreadBarkeeper> {
@@ -142,7 +142,7 @@ impl ThreadStateTracker for ThreadBarkeeper {
     fn start(&self) {
         self.mp.add(self.bar.clone());
         self.bar.tick();
-        self.bar.enable_steady_tick(Duration::from_millis(75));
+        self.bar.enable_steady_tick(std::time::Duration::from_millis(75));
     }
 
     fn job_completed(&self) {
