@@ -69,6 +69,10 @@ struct Args {
     /// Set parameters for the initial job
     #[clap(short, long, value_parser = parse_key_val::<String, String>)]
     parameters: Vec<(String, String)>,
+
+    /// Set or overwrite globals
+    #[clap(short, long, value_parser = parse_key_val::<String, String>)]
+    override_const: Vec<(String, String)>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -143,7 +147,8 @@ fn main() {
 
     // read zinnfile
     let contents = resolve(fs::read_to_string(&args.file));
-    let zinnfile: Zinnfile = resolve(serde_yaml::from_str(&contents));
+    let mut zinnfile: Zinnfile = resolve(serde_yaml::from_str(&contents));
+    zinnfile.constants.extend(args.override_const.iter().cloned());
 
     // --list
     if args.list {
