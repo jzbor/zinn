@@ -127,9 +127,10 @@ where
     Ok((s[..pos].parse()?, s[pos + 1..].parse()?))
 }
 
-fn main() {
-    let args = Args::parse();
-
+fn main_with_barkeeper<T: StateTracker>(barkeeper: T, args: Args)
+where
+    <T as StateTracker>::ThreadStateTracker: 'static
+{
     // process arguments
     if args.docs {
         let result = std::process::Command::new("xdg-open")
@@ -178,7 +179,6 @@ fn main() {
     }
 
     // setup bars
-    let barkeeper = barkeeper::Barkeeper::new();
     let mut thread_barkeepers = barkeeper.for_threads(nthreads);
 
     // feed the queue
@@ -205,7 +205,7 @@ fn main() {
     // start the threads
     let threads: Vec<_> = (0..nthreads).map(|_| {
         let queue = queue.clone();
-        let tb = thread_barkeepers.pop().unwrap();
+        let tb: T::ThreadStateTracker = thread_barkeepers.pop().unwrap();
         let options = args.options();
 
         thread::spawn(move || {
@@ -220,5 +220,15 @@ fn main() {
     queue.done();
     for thread in threads {
         let _ = thread.join();
+    }
+}
+
+fn main() {
+    let args = Args::parse();
+
+    if args.no_progress {
+        main_with_barkeeper(barkeeper::DummyBarkeeper::new(), args)
+    } else {
+        main_with_barkeeper(barkeeper::Barkeeper::new(), args)
     }
 }

@@ -8,12 +8,13 @@ struct DummyStatusWriter(String, String);
 
 
 pub trait StateTracker {
+    type ThreadStateTracker: ThreadStateTracker;
     fn set_njobs(&self, njobs: usize);
     fn start(&self);
-    fn for_threads(&self, nthreads: usize) -> Vec<impl ThreadStateTracker>;
+    fn for_threads(&self, nthreads: usize) -> Vec<Self::ThreadStateTracker>;
 }
 
-pub trait ThreadStateTracker {
+pub trait ThreadStateTracker: Send {
     fn out(&mut self) -> &mut impl Write;
     fn status(&mut self) -> &mut impl Write;
     fn job_completed(&self);
@@ -59,6 +60,8 @@ impl DummyBarkeeper {
 }
 
 impl StateTracker for Barkeeper {
+    type ThreadStateTracker = ThreadBarkeeper;
+
     fn set_njobs(&self, njobs: usize) {
         self.bar.set_length(njobs as u64)
     }
@@ -87,6 +90,8 @@ impl StateTracker for Barkeeper {
 }
 
 impl StateTracker for DummyBarkeeper {
+    type ThreadStateTracker = DummyThreadBarkeeper;
+
     fn set_njobs(&self, _njobs: usize) {}
 
     fn start(&self) {}
