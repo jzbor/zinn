@@ -121,7 +121,8 @@ impl JobDescription {
 
             if let Some(with_list) = &dep.with_list {
                 let inputs = handlebars.render_template(&with_list.inputs, &combined_vars)?;
-                let val_list = inputs.split(char::is_whitespace);
+                let val_list = inputs.split(char::is_whitespace)
+                    .filter(|v| !v.is_empty());
                 for val in val_list {
                     // mutating the environment is fine, as it will be overridden
                     // for every iteration with the proper value.
@@ -138,7 +139,9 @@ impl JobDescription {
         let mut inputs = Vec::new();
         if let Some(input_str) = &self.inputs {
             let rendered_input_str = handlebars.render_template(input_str, &combined_vars)?;
-            let additional_inputs = rendered_input_str .split(char::is_whitespace).map(|s| s.to_owned());
+            let additional_inputs = rendered_input_str.split(char::is_whitespace)
+                .filter(|v| !v.is_empty())
+                .map(|s| s.to_owned());
             inputs.extend(additional_inputs)
         }
         for input in &self.input_list {
@@ -147,7 +150,9 @@ impl JobDescription {
         let mut outputs = Vec::new();
         if let Some(output_str) = &self.outputs {
             let rendered_output_str = handlebars.render_template(output_str, &combined_vars)?;
-            let additional_outputs = rendered_output_str .split(char::is_whitespace).map(|s| s.to_owned());
+            let additional_outputs = rendered_output_str .split(char::is_whitespace)
+                .filter(|v| !v.is_empty())
+                .map(|s| s.to_owned());
             outputs.extend(additional_outputs)
         }
         for output in &self.output_list {
