@@ -73,6 +73,7 @@ struct Args {
     override_const: Vec<(String, String)>,
 
     /// Disable progress bars
+    #[cfg(feature = "progress")]
     #[clap(short, long)]
     no_progress: bool,
 }
@@ -226,9 +227,13 @@ where
 fn main() {
     let args = Args::parse();
 
+    #[cfg(feature = "progress")]
     if args.no_progress {
         main_with_barkeeper(barkeeper::DummyBarkeeper::new(), args)
     } else {
         main_with_barkeeper(barkeeper::Barkeeper::new(), args)
     }
+
+    #[cfg(not(feature = "progress"))]
+    main_with_barkeeper(barkeeper::DummyBarkeeper::new(), args)
 }

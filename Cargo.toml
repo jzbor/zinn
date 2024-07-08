@@ -7,7 +7,7 @@ edition = "2021"
 clap = { version = "4.5.8", features = ["derive"] }
 console = "0.15.8"
 handlebars = "5.1.2"
-indicatif = "0.17.8"
+indicatif = { version = "0.17.8", optional = true }
 os_pipe = "1.2.0"
 regex = { version = "1.10.5", optional = true }
 serde = { version = "1.0.203", features = ["derive"] }
@@ -16,4 +16,5 @@ thiserror = "1.0.61"
 
 [features]
 regex = ["dep:regex"]
-default = ["regex"]
+progress = ["dep:indicatif"]
+default = ["regex", "progress"]

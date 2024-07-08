@@ -1,7 +1,9 @@
 use std::{fmt::Write, time::Duration};
 
 
+#[cfg(feature = "progress")]
 struct BarMessageWriter(String, indicatif::ProgressBar);
+#[cfg(feature = "progress")]
 struct BarPrintWriter(String, indicatif::ProgressBar);
 struct DummyOutWriter();
 struct DummyStatusWriter(String, String);
@@ -22,11 +24,13 @@ pub trait ThreadStateTracker: Send {
     fn set_prefix(&mut self, prefix: String);
 }
 
+#[cfg(feature = "progress")]
 pub struct Barkeeper {
     mp: indicatif::MultiProgress,
     bar: indicatif::ProgressBar,
 }
 
+#[cfg(feature = "progress")]
 pub struct ThreadBarkeeper {
     message_writer: BarMessageWriter,
     print_writer: BarPrintWriter,
@@ -42,6 +46,7 @@ pub struct DummyThreadBarkeeper {
 }
 
 
+#[cfg(feature = "progress")]
 impl Barkeeper {
     pub fn new() -> Self {
         let mp = indicatif::MultiProgress::new();
@@ -59,6 +64,7 @@ impl DummyBarkeeper {
     }
 }
 
+#[cfg(feature = "progress")]
 impl StateTracker for Barkeeper {
     type ThreadStateTracker = ThreadBarkeeper;
 
@@ -123,6 +129,7 @@ impl ThreadStateTracker for DummyThreadBarkeeper {
     }
 }
 
+#[cfg(feature = "progress")]
 impl ThreadStateTracker for ThreadBarkeeper {
     fn out(&mut self) -> &mut impl Write {
         &mut self.print_writer
@@ -148,6 +155,7 @@ impl ThreadStateTracker for ThreadBarkeeper {
 }
 
 
+#[cfg(feature = "progress")]
 impl Write for BarMessageWriter {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
         for c in s.chars() {
@@ -168,6 +176,7 @@ impl Write for BarMessageWriter {
     }
 }
 
+#[cfg(feature = "progress")]
 impl Write for BarPrintWriter {
     fn write_str(&mut self, s: &str) -> std::fmt::Result {
         for c in s.chars() {
