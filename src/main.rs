@@ -1,27 +1,25 @@
 #![doc = include_str!("../README.md")]
 
+use barkeeper::{StateTracker, ThreadStateTracker};
 use clap::Parser;
 use handlebars::Handlebars;
 use queue::Queue;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
-use std::time::Duration;
 use std::{fs, thread};
-use indicatif::MultiProgress;
-use indicatif::ProgressBar;
-use indicatif::ProgressStyle;
 
 use error::*;
 use job::*;
 
 
-mod error;
-mod job;
-mod worker;
-mod queue;
-mod hbextensions;
+mod barkeeper;
 mod constants;
+mod error;
+mod hbextensions;
+mod job;
+mod queue;
+mod worker;
 
 
 const DOCS_URL: &str = "https://jzbor.de/zinn/zinn";
@@ -177,16 +175,8 @@ fn main() {
     }
 
     // setup bars
-    let mp = MultiProgress::new();
-    let main_bar_style = ProgressStyle::with_template("[{elapsed}] {wide_bar} {pos}/{len}").unwrap();
-    let main_bar = ProgressBar::new(zinnfile.jobs.len() as u64);
-    main_bar.set_style(main_bar_style);
-    let mut bars: Vec<_> = (0..nthreads).map(|_| {
-        let bar = ProgressBar::new(10000000);
-        bar.set_style(ProgressStyle::with_template("{spinner} {prefix:.cyan} {wide_msg}").unwrap());
-        mp.add(bar.clone());
-        bar
-    }).collect();
+    let barkeeper = barkeeper::Barkeeper::new();
+    let mut thread_barkeepers = barkeeper.for_threads(nthreads);
 
     // feed the queue
     let queue = Queue::new();
@@ -202,29 +192,26 @@ fn main() {
         queue.enqueue(job);
     }
 
-    main_bar.set_length(queue.len() as u64);
+    barkeeper.set_njobs(queue.len());
 
     // start worker bars
-    for bar in &mut bars {
-        bar.tick();
-        bar.enable_steady_tick(Duration::from_millis(75));
+    for tb in &thread_barkeepers {
+        tb.start();
     }
 
     // start the threads
     let threads: Vec<_> = (0..nthreads).map(|_| {
-        let main_bar = main_bar.clone();
         let queue = queue.clone();
-        let bar = bars.pop().unwrap();
+        let tb = thread_barkeepers.pop().unwrap();
         let options = args.options();
 
         thread::spawn(move || {
-            worker::run_worker(queue, bar, main_bar, options)
+            worker::run_worker(queue, tb, options)
         })
     }).collect();
 
     // enable the main bar
-    mp.add(main_bar.clone());
-    main_bar.enable_steady_tick(Duration::from_millis(75));
+    barkeeper.start();
 
     // wait for the work to be completed
     queue.done();

@@ -9,6 +9,7 @@ use std::sync::Arc;
 use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
 
+use crate::barkeeper::ThreadStateTracker;
 use crate::error::*;
 use crate::queue::JobState;
 use crate::Options;
@@ -177,11 +178,11 @@ impl JobDescription {
 }
 
 impl InnerJobRealization {
-    pub fn run(&self, status_writer: &mut impl Write, log_writer: &mut impl Write, options: &Options) -> ZinnResult<JobState> {
+    pub fn run(&self, tracker: &mut impl ThreadStateTracker, options: &Options) -> ZinnResult<JobState> {
         // skip if dry run
         if options.dry_run {
             if options.trace {
-                let _ = writeln!(log_writer, "{}", self.cmd());
+                let _ = writeln!(tracker.out(), "{}", self.cmd());
             }
             return Ok(JobState::Finished);
         }
@@ -218,7 +219,7 @@ impl InnerJobRealization {
 
         // print out trace
         if options.trace {
-            let _ = writeln!(log_writer, "{}", self.cmd());
+            let _ = writeln!(tracker.out(), "{}", self.cmd());
         }
 
         let (io_reader, io_writer) = os_pipe::pipe()?;
@@ -234,17 +235,17 @@ impl InnerJobRealization {
         let mut last_line: Option<String> = None;
 
         for line in BufReader::new(io_reader).lines().map_while(Result::ok) {
-            let _ = writeln!(status_writer, "{}", line);
+            let _ = writeln!(tracker.status(), "{}", line);
 
             if options.verbose {
                 if let Some(line) = last_line.take() {
-                    let _ = writeln!(log_writer, "{}: {}", self, line);
+                    let _ = writeln!(tracker.out(), "{}: {}", self, line);
                 }
                 last_line = Some(line);
             }
         }
         if let Some(line) = last_line.take() {
-            let _ = writeln!(log_writer, "{}: {}", self, line);
+            let _ = writeln!(tracker.out(), "{}: {}", self, line);
         }
 
         let status = process.wait()?;
