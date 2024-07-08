@@ -12,9 +12,6 @@ pub enum ZinnError {
     #[error("{0}")]
     Yaml(#[from] serde_yaml::Error),
 
-    #[error("Unable to open stdin")]
-    ShellStdin(),
-
     #[error("Child exited unsuccessfully")]
     Child(),
 

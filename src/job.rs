@@ -2,9 +2,8 @@ use std::collections::HashMap;
 use std::fmt::{self, Write};
 use std::fs;
 use std::path::Path;
-use std::process::{Command, Stdio};
-use std::io::{BufWriter, BufRead, BufReader};
-use std::io::Write as _;
+use std::process::Command;
+use std::io::{BufRead, BufReader};
 use std::sync::Arc;
 
 use handlebars::Handlebars;
@@ -220,19 +219,12 @@ impl InnerJobRealization {
         let (io_reader, io_writer) = os_pipe::pipe()?;
 
         let mut process = Command::new("sh")
-            .stdin(Stdio::piped())
+            .arg("-c")
+            .arg(&self.run)
             .stdout(io_writer.try_clone()?)
             .stderr(io_writer)
             .spawn()?;
 
-
-        let stdin = process.stdin.take()
-            .ok_or_else(ZinnError::ShellStdin)?;
-        let mut writer = BufWriter::new(&stdin);
-        write!(writer, "{}", self.run)?;
-        writer.flush()?;
-        drop(writer);
-        drop(stdin);
 
         let output = String::new();
         let mut last_line: Option<String> = None;
