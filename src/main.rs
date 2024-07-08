@@ -71,6 +71,10 @@ struct Args {
     /// Set or overwrite globals
     #[clap(short, long, value_parser = parse_key_val::<String, String>)]
     override_const: Vec<(String, String)>,
+
+    /// Disable progress bars
+    #[clap(short, long)]
+    no_progress: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -159,7 +163,6 @@ fn main() {
         }
         return;
     }
-
 
     // init template engine
     let mut handlebars = Handlebars::new();

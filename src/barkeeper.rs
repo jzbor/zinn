@@ -3,6 +3,8 @@ use std::{fmt::Write, time::Duration};
 
 struct BarMessageWriter(String, indicatif::ProgressBar);
 struct BarPrintWriter(String, indicatif::ProgressBar);
+struct DummyOutWriter();
+struct DummyStatusWriter(String, String);
 
 
 pub trait StateTracker {
@@ -16,7 +18,7 @@ pub trait ThreadStateTracker {
     fn status(&mut self) -> &mut impl Write;
     fn job_completed(&self);
     fn start(&self);
-    fn set_prefix(&self, prefix: String);
+    fn set_prefix(&mut self, prefix: String);
 }
 
 pub struct Barkeeper {
@@ -32,6 +34,12 @@ pub struct ThreadBarkeeper {
     main_bar: indicatif::ProgressBar,
 }
 
+pub struct DummyBarkeeper {}
+pub struct DummyThreadBarkeeper {
+    out_writer: DummyOutWriter,
+    status_writer: DummyStatusWriter,
+}
+
 
 impl Barkeeper {
     pub fn new() -> Self {
@@ -41,6 +49,12 @@ impl Barkeeper {
         bar.set_style(bar_style);
 
         Barkeeper { mp, bar }
+    }
+}
+
+impl DummyBarkeeper {
+    pub fn new() -> Self {
+        DummyBarkeeper {}
     }
 }
 
@@ -72,6 +86,38 @@ impl StateTracker for Barkeeper {
     }
 }
 
+impl StateTracker for DummyBarkeeper {
+    fn set_njobs(&self, _njobs: usize) {}
+
+    fn start(&self) {}
+
+    fn for_threads(&self, nthreads: usize) -> Vec<DummyThreadBarkeeper> {
+        (0..nthreads).map(|_| {
+            let out_writer = DummyOutWriter();
+            let status_writer = DummyStatusWriter(String::new(), String::new());
+            DummyThreadBarkeeper { out_writer, status_writer }
+        }).collect()
+    }
+}
+
+impl ThreadStateTracker for DummyThreadBarkeeper {
+    fn out(&mut self) -> &mut impl Write {
+        &mut self.out_writer
+    }
+
+    fn status(&mut self) -> &mut impl Write {
+        &mut self.status_writer
+    }
+
+    fn job_completed(&self) {}
+
+    fn start(&self) {}
+
+    fn set_prefix(&mut self, prefix: String) {
+        self.status_writer.0 = prefix;
+    }
+}
+
 impl ThreadStateTracker for ThreadBarkeeper {
     fn out(&mut self) -> &mut impl Write {
         &mut self.print_writer
@@ -91,7 +137,7 @@ impl ThreadStateTracker for ThreadBarkeeper {
         self.main_bar.inc(1)
     }
 
-    fn set_prefix(&self, prefix: String) {
+    fn set_prefix(&mut self, prefix: String) {
         self.bar.set_prefix(prefix)
     }
 }
@@ -131,6 +177,32 @@ impl Write for BarPrintWriter {
             self.0.clear();
         } else {
             self.0.push(c)
+        }
+        Ok(())
+    }
+}
+
+impl Write for DummyOutWriter {
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        print!("{}", s);
+        Ok(())
+    }
+}
+
+impl Write for DummyStatusWriter {
+    fn write_str(&mut self, s: &str) -> std::fmt::Result {
+        for c in s.chars() {
+            self.write_char(c)?
+        }
+        Ok(())
+    }
+
+    fn write_char(&mut self, c: char) -> std::fmt::Result {
+        if c == '\n' {
+            println!("{} {}", self.0, self.1);
+            self.1.clear();
+        } else {
+            self.1.push(c);
         }
         Ok(())
     }
