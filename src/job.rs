@@ -10,6 +10,7 @@ use handlebars::Handlebars;
 use serde::{Deserialize, Serialize};
 
 use crate::error::*;
+use crate::queue::JobState;
 use crate::Options;
 
 
@@ -172,13 +173,13 @@ impl JobDescription {
 }
 
 impl InnerJobRealization {
-    pub fn run(&self, status_writer: &mut impl Write, log_writer: &mut impl Write, options: &Options) -> ZinnResult<String> {
+    pub fn run(&self, status_writer: &mut impl Write, log_writer: &mut impl Write, options: &Options) -> ZinnResult<JobState> {
         // skip if dry run
         if options.dry_run {
             if options.trace {
                 let _ = writeln!(log_writer, "{}", self.cmd());
             }
-            return Ok(String::from("(dry run)"));
+            return Ok(JobState::Finished);
         }
 
         // check if all input files exist
@@ -207,7 +208,7 @@ impl InnerJobRealization {
                 }
             }
             if !dirty {
-                return Ok(String::from("Nothing to do"));
+                return Ok(JobState::Skipped);
             }
         }
 
@@ -226,7 +227,6 @@ impl InnerJobRealization {
             .spawn()?;
 
 
-        let output = String::new();
         let mut last_line: Option<String> = None;
 
         for line in BufReader::new(io_reader).lines().map_while(Result::ok) {
@@ -254,7 +254,7 @@ impl InnerJobRealization {
         if !status.success() {
             Err(ZinnError::Child())
         } else {
-            Ok(output)
+            Ok(JobState::Finished)
         }
     }
 

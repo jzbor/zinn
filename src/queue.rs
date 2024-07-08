@@ -9,11 +9,12 @@ pub struct Queue {
 }
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
-enum JobState {
+pub enum JobState {
     Ready,
     Failed,
     Running,
     Finished,
+    Skipped,
 }
 
 struct InnerQueue {
@@ -85,9 +86,25 @@ impl Queue {
 }
 
 impl InnerQueue {
+    fn is_completed(&self, job: JobRealization) -> bool {
+        if let Some(state) = self.states.get(&job) {
+            *state == JobState::Finished  || *state == JobState::Skipped || *state == JobState::Failed
+        } else {
+            false
+        }
+    }
+
+    fn is_completed_successfully(&self, job: JobRealization) -> bool {
+        if let Some(state) = self.states.get(&job) {
+            *state == JobState::Finished  || *state == JobState::Skipped
+        } else {
+            false
+        }
+    }
+
     fn dependencies_satisfied(&self, job: JobRealization) -> bool {
         for dep in job.dependencies() {
-            if self.states.get(&dep) != Some(JobState::Finished).as_ref() {
+            if !self.is_completed_successfully(dep) {
                 return false;
             }
         }
@@ -115,18 +132,13 @@ impl InnerQueue {
 
     /// Determines whether the task is running or may be run in the future
     fn task_alive(&self, job: JobRealization) -> bool {
-        let state = match self.states.get(&job) {
-            Some(state) => *state,
-            None => return false,
-        };
-
-        if state == JobState::Finished || state == JobState::Failed {
+        if self.is_completed(job.clone()) {
             return false;
         }
 
         for dep in job.dependencies() {
             if !self.task_alive(dep.clone())
-                    && self.states.get(&dep) != Some(JobState::Finished).as_ref() {
+                    && !self.is_completed_successfully(dep.clone()) {
                 return false;
             }
         }

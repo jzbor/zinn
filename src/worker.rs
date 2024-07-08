@@ -2,7 +2,7 @@ use std::fmt::Write;
 
 use indicatif::ProgressBar;
 
-use crate::queue::Queue;
+use crate::queue::{JobState, Queue};
 use crate::Options;
 
 struct BarMessageWriter(String, ProgressBar);
@@ -56,12 +56,18 @@ pub fn run_worker(queue: Queue, bar: ProgressBar, main_bar: ProgressBar, options
         bar.set_message("");
         if let Some(job) = queue.fetch() {
             bar.set_prefix(job.to_string());
-            if let Err(e) = job.run(&mut status_writer, &mut log_writer, &options) {
+            if let Ok(state) = job.run(&mut status_writer, &mut log_writer, &options) {
+                match state {
+                    JobState::Finished => bar.println(console::style(format!("=> DONE {}", job)).green().to_string()),
+                    JobState::Skipped => bar.println(console::style(format!("=> SKIPPED {}", job)).yellow().to_string()),
+                    JobState::Failed => bar.println(console::style(format!("=> FAILED {}", job)).red().to_string()),
+                    _ => panic!("Invalid job state after run: {:?}", state),
+
+                }
+                queue.finished(job);
+            } else if let Err(e) = job.run(&mut status_writer, &mut log_writer, &options) {
                 bar.println(console::style(format!("=> FAILED {}: {}", job, e)).red().to_string());
                 queue.failed(job);
-            } else {
-                bar.println(console::style(format!("=> DONE {}", job)).green().to_string());
-                queue.finished(job);
             }
             main_bar.inc(1);
         } else {
