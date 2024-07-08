@@ -28,9 +28,9 @@ jobs:
   binary:
     requires:
       - job: object
-        with_list:
-          param: path
-          inputs: "{{SOURCES}}"
+        foreach:
+          var: path
+          in: "{{SOURCES}}"
       - job: builddir
     inputs: "{{OBJECTS}}"
     outputs: "{{BUILDDIR}}/{{BIN}}"

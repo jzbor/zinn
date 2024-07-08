@@ -160,8 +160,6 @@ fn main() {
         let bar = ProgressBar::new(10000000);
         bar.set_style(ProgressStyle::with_template("{spinner} {prefix:.cyan} {wide_msg}").unwrap());
         mp.add(bar.clone());
-        bar.tick();
-        bar.enable_steady_tick(Duration::from_millis(75));
         bar
     }).collect();
 
@@ -179,6 +177,12 @@ fn main() {
     }
 
     main_bar.set_length(queue.len() as u64);
+
+    // start worker bars
+    for bar in &mut bars {
+        bar.tick();
+        bar.enable_steady_tick(Duration::from_millis(75));
+    }
 
     // start the threads
     let threads: Vec<_> = (0..nthreads).map(|_| {
