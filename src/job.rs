@@ -70,17 +70,17 @@ pub struct JobDependency {
 
     /// Feed an argument by iterating over a space-separated list
     #[serde(default)]
-    with_list: Option<WithList>,
+    foreach: Option<Foreach>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct WithList {
+pub struct Foreach {
     /// Parameter name
-    param: String,
+    var: String,
 
     /// List of input values (space-separated)
     #[serde(default)]
-    inputs: String,
+    r#in: String,
 }
 
 
@@ -119,14 +119,14 @@ impl JobDescription {
                 None => return Err(ZinnError::DependencyNotFound(dep.job.to_owned())),
             };
 
-            if let Some(with_list) = &dep.with_list {
-                let inputs = handlebars.render_template(&with_list.inputs, &combined_vars)?;
+            if let Some(with_list) = &dep.foreach {
+                let inputs = handlebars.render_template(&with_list.r#in, &combined_vars)?;
                 let val_list = inputs.split(char::is_whitespace)
                     .filter(|v| !v.is_empty());
                 for val in val_list {
                     // mutating the environment is fine, as it will be overridden
                     // for every iteration with the proper value.
-                    realized_dep_desc.insert(with_list.param.to_owned(), val.to_owned());
+                    realized_dep_desc.insert(with_list.var.to_owned(), val.to_owned());
                     let dep_realization = dep_desc.realize(&dep.job, job_descriptions, handlebars, constants, &realized_dep_desc)?;
                     dependencies.push(dep_realization);
                 }
