@@ -49,6 +49,21 @@ fn joinlines(h: &Helper, _: &Handlebars, _: &Context, _: &mut RenderContext, out
     Ok(())
 }
 
+fn without(h: &Helper, _: &Handlebars, _: &Context, _: &mut RenderContext, out: &mut dyn Output) -> HelperResult {
+    if h.params().len() < 2 {
+        return Err(RenderErrorReason::ParamNotFoundForIndex("without", h.params().len()).into())
+    }
+
+    let mut temp = h.params().first().unwrap().value().render();
+    for par in h.params().iter().skip(1) {
+        temp = temp.replace(&par.value().render(), "");
+    }
+    out.write(&temp)?;
+
+
+    Ok(())
+}
+
 #[cfg(feature = "regex")]
 fn re(h: &Helper, _: &Handlebars, _: &Context, _: &mut RenderContext, out: &mut dyn Output) -> HelperResult {
 
@@ -87,6 +102,7 @@ pub fn register_helpers(handlebars: &mut Handlebars) {
     handlebars.register_helper("subst", Box::new(subst));
     handlebars.register_helper("joinlines", Box::new(joinlines));
     handlebars.register_helper("cat", Box::new(cat));
+    handlebars.register_helper("without", Box::new(without));
     #[cfg(feature = "regex")]
     handlebars.register_helper("re", Box::new(re));
 }
