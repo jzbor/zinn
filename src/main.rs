@@ -5,6 +5,7 @@ use handlebars::Handlebars;
 use queue::Queue;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::error::Error;
 use std::time::Duration;
 use std::{fs, thread};
 use indicatif::MultiProgress;
@@ -64,6 +65,10 @@ struct Args {
     /// Don't actually execute the commands
     #[clap(long)]
     dry_run: bool,
+
+    /// Set parameters for the initial job
+    #[clap(short, long, value_parser = parse_key_val::<String, String>)]
+    parameters: Vec<(String, String)>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -99,6 +104,21 @@ impl Args {
             dry_run: self.dry_run,
         }
     }
+}
+
+
+/// Parse a single key-value pair
+fn parse_key_val<T, U>(s: &str) -> Result<(T, U), Box<dyn Error + Send + Sync + 'static>>
+where
+    T: std::str::FromStr,
+    T::Err: Error + Send + Sync + 'static,
+    U: std::str::FromStr,
+    U::Err: Error + Send + Sync + 'static,
+{
+    let pos = s
+        .find('=')
+        .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{s}`"))?;
+    Ok((s[..pos].parse()?, s[pos + 1..].parse()?))
 }
 
 fn main() {
@@ -165,9 +185,10 @@ fn main() {
 
     // feed the queue
     let queue = Queue::new();
+    let parameters = args.parameters.iter().cloned().collect();
     for name in &args.targets {
         let job = match zinnfile.jobs.get(name) {
-            Some(job) => resolve(job.realize(name, &zinnfile.jobs, &handlebars, &constants, &HashMap::new())),
+            Some(job) => resolve(job.realize(name, &zinnfile.jobs, &handlebars, &constants, &parameters)),
             None => resolve(Err(ZinnError::JobNotFound(name.to_owned()))),
         };
         for dep in job.transitive_dependencies() {
