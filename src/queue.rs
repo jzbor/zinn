@@ -20,6 +20,7 @@ struct InnerQueue {
     jobs: VecDeque<JobRealization>,
     states: HashMap<JobRealization, JobState>,
     done: bool,
+    failed: bool,
 }
 
 impl Queue {
@@ -28,6 +29,7 @@ impl Queue {
             jobs: VecDeque::new(),
             states: HashMap::new(),
             done: false,
+            failed: false,
         };
         Queue {
             inner: Arc::new(Mutex::new(inner)),
@@ -48,7 +50,7 @@ impl Queue {
     pub fn fetch(&self) -> Option<JobRealization> {
         let mut inner = self.inner.lock().unwrap();
         loop {
-            if inner.done && !inner.has_alive_tasks() {
+            if (inner.done && !inner.has_alive_tasks()) || inner.failed {
                 return None;
             }
 
@@ -68,6 +70,7 @@ impl Queue {
     pub fn failed(&self, failed_job: JobRealization) {
         let mut inner = self.inner.lock().unwrap();
         inner.states.insert(failed_job, JobState::Failed);
+        inner.failed = true;
         self.cond_fetch_job.notify_all();
     }
 
