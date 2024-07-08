@@ -68,7 +68,7 @@ struct Args {
 
     /// Set parameters for the initial job
     #[clap(short, long, value_parser = parse_key_val::<String, String>)]
-    parameters: Vec<(String, String)>,
+    param: Vec<(String, String)>,
 
     /// Set or overwrite globals
     #[clap(short, long, value_parser = parse_key_val::<String, String>)]
@@ -190,7 +190,7 @@ fn main() {
 
     // feed the queue
     let queue = Queue::new();
-    let parameters = args.parameters.iter().cloned().collect();
+    let parameters = args.param.iter().cloned().collect();
     for name in &args.targets {
         let job = match zinnfile.jobs.get(name) {
             Some(job) => resolve(job.realize(name, &zinnfile.jobs, &handlebars, &constants, &parameters)),
