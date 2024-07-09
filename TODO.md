@@ -1,6 +1,6 @@
 # TODOs
 - [ ] Non-bars mode
 - [x] Default values
-- [ ] Flake
+- [x] Flake
 - [x] Rename constants?
 - [x] Pass args on cli
