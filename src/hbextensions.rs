@@ -10,7 +10,7 @@ fn parse_list(s: &str) -> Vec<String> {
         .collect()
 }
 
-fn encode_list(l: &Vec<String>) -> String {
+fn encode_list(l: &[String]) -> String {
     l.join(" ")
 }
 
@@ -64,7 +64,7 @@ fn lst_prefix(h: &Helper, _: &Handlebars, _: &Context, _: &mut RenderContext, ou
     let prefix = h.params().first().unwrap().value().render();
     let list = parse_list(&h.params().get(1).unwrap().value().render());
 
-    let result = list.iter()
+    let result: Vec<String> = list.iter()
         .map(|e| format!("{}{}", &prefix, e))
         .collect();
 
@@ -88,7 +88,7 @@ fn lst_re(h: &Helper, _: &Handlebars, _: &Context, _: &mut RenderContext, out: &
     let re = regex::Regex::new(&pattern)
         .map_err(|e| RenderErrorReason::Other(format!("regex error - {e}")))?;
 
-    let result = list.iter()
+    let result: Vec<String> = list.iter()
         .map(|e| re.replace_all(e, &replacement).to_string())
         .collect();
 
@@ -106,7 +106,7 @@ fn lst_suffix(h: &Helper, _: &Handlebars, _: &Context, _: &mut RenderContext, ou
     let suffix = h.params().first().unwrap().value().render();
     let list = parse_list(&h.params().get(1).unwrap().value().render());
 
-    let result = list.iter()
+    let result: Vec<String> = list.iter()
         .map(|e| format!("{}{}", e, &suffix))
         .collect();
 
@@ -124,8 +124,8 @@ fn lst_without(h: &Helper, _: &Handlebars, _: &Context, _: &mut RenderContext, o
     let list = parse_list(&h.params().first().unwrap().value().render());
     let remove_list: Vec<String> = h.params().iter().skip(1).map(|p| p.value().render()).collect();
 
-    let result = list.into_iter()
-        .filter(|e| !remove_list.contains(&e))
+    let result: Vec<String> = list.into_iter()
+        .filter(|e| !remove_list.contains(e))
         .collect();
 
     out.write(&encode_list(&result))?;
