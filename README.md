@@ -50,3 +50,16 @@ jobs:
 
 You can find more information on the available options [in the source documentation](`crate::Zinnfile`).
 
+
+## Templating Functions
+Zinn provides custom functions for the templating language:
+- `cat <s1> <s2>...`: Concatenate all parameters
+- `joinlines <var>`: Join lines and connect them with a regular whitespace
+- `lst <s1> <s2>...`: Create a space-separated list from all input parameters
+- `lst-prefix <prefix> <list>`: Add a prefix to each element in a space-separated list
+- `lst-re <list> <pattern> <replacement>`: Apply a regex replacement operation to each item in a space-separated list
+- `lst-suffix <prefix> <list>`: Add a suffix to each element in a space-separated list
+- `lst-without <list> <remove1> <remove2>...`: Create copy of a space-separated list without certain elements
+- `re <base> <pattern> <replacement>`: Apply a regex replacement operation to an input string
+- `shell <cmd>`: Create a string from the output of a shell command
+- `subst <base> <pattern> <replacement>`: Replace all occurrences of a substring
