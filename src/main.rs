@@ -7,7 +7,8 @@ use queue::Queue;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
-use std::{fs, thread};
+use std::process::{Command, Stdio};
+use std::{env, fs, thread};
 
 use error::*;
 use job::*;
@@ -23,6 +24,7 @@ mod worker;
 
 
 const DOCS_URL: &str = "https://jzbor.de/zinn/zinn";
+const NIX_ENV_MARKER: &str = "ZINN_NIX_ENV";
 
 
 #[derive(Parser)]
@@ -100,6 +102,16 @@ struct Zinnfile {
     ///
     /// See also [`JobDescription`].
     jobs: HashMap<String, JobDescription>,
+
+    /// Nix configuration
+    ///
+    /// See also [`NixConfig`]
+    nix: Option<NixConfig>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct NixConfig {
+    packages: Vec<String>,
 }
 
 impl Args {
@@ -126,6 +138,34 @@ where
         .find('=')
         .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{s}`"))?;
     Ok((s[..pos].parse()?, s[pos + 1..].parse()?))
+}
+
+fn check_nix_flakes() -> bool {
+    Command::new("nix")
+        .arg("shell")
+        .arg("--version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok()
+}
+
+fn wrap_nix(nix_config: NixConfig) -> ZinnResult<()>{
+    let packages = nix_config.packages.iter()
+        .map(|p| format!("nixpkgs#{}", p));
+    Command::new("nix")
+        .arg("shell")
+        .args(packages)
+        .arg("--command")
+        .args(env::args())
+        .env(NIX_ENV_MARKER, "1")
+        .status()?;
+
+    Ok(())
+}
+
+fn inside_nix_wrap() -> bool {
+    env::var(NIX_ENV_MARKER).is_ok()
 }
 
 fn main_with_barkeeper<T: StateTracker>(barkeeper: T, args: Args)
@@ -164,6 +204,14 @@ where
             println!();
         }
         return;
+    }
+
+    // enter nix wrap if desired
+    if let Some(nix_config) = zinnfile.nix {
+        if !inside_nix_wrap() && check_nix_flakes() {
+            resolve(wrap_nix(nix_config));
+            return;
+        }
     }
 
     // init template engine
