@@ -7,8 +7,7 @@ use queue::Queue;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
-use std::process::{Command, Stdio};
-use std::{env, fs, thread};
+use std::{fs, thread};
 
 use error::*;
 use job::*;
@@ -19,12 +18,12 @@ mod constants;
 mod error;
 mod hbextensions;
 mod job;
+mod nix;
 mod queue;
 mod worker;
 
 
 const DOCS_URL: &str = "https://jzbor.de/zinn/zinn";
-const NIX_ENV_MARKER: &str = "ZINN_NIX_ENV";
 
 
 #[derive(Parser)]
@@ -78,6 +77,11 @@ struct Args {
     #[cfg(feature = "progress")]
     #[clap(short, long)]
     no_progress: bool,
+
+    /// Open an interactive shell containing the specified Nix packages
+    #[clap(long)]
+    nix_shell: bool,
+
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -140,33 +144,6 @@ where
     Ok((s[..pos].parse()?, s[pos + 1..].parse()?))
 }
 
-fn check_nix_flakes() -> bool {
-    Command::new("nix")
-        .arg("shell")
-        .arg("--version")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .is_ok()
-}
-
-fn wrap_nix(nix_config: NixConfig) -> ZinnResult<()>{
-    let packages = nix_config.packages.iter()
-        .map(|p| format!("nixpkgs#{}", p));
-    Command::new("nix")
-        .arg("shell")
-        .args(packages)
-        .arg("--command")
-        .args(env::args())
-        .env(NIX_ENV_MARKER, "1")
-        .status()?;
-
-    Ok(())
-}
-
-fn inside_nix_wrap() -> bool {
-    env::var(NIX_ENV_MARKER).is_ok()
-}
 
 fn main_with_barkeeper<T: StateTracker>(barkeeper: T, args: Args)
 where
@@ -206,10 +183,17 @@ where
         return;
     }
 
-    // enter nix wrap if desired
-    if let Some(nix_config) = zinnfile.nix {
-        if !inside_nix_wrap() && check_nix_flakes() {
-            resolve(wrap_nix(nix_config));
+    // Nix features
+    if let Some(nix_config) = &zinnfile.nix {
+        // --nix-shell
+        if !nix::inside_wrap() && args.nix_shell {
+            resolve(nix::enter_shell(nix_config));
+            return;
+        }
+
+        // enter nix wrap if desired
+        if !nix::inside_wrap() && nix::check_flakes() {
+            resolve(nix::wrap(&nix_config));
             return;
         }
     }
