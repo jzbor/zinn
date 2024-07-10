@@ -82,6 +82,9 @@ struct Args {
     #[clap(long)]
     nix_shell: bool,
 
+    /// Don't run jobs in a nix shell
+    #[clap(long)]
+    no_nix: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -192,7 +195,7 @@ where
         }
 
         // enter nix wrap if desired
-        if !nix::inside_wrap() && nix::check_flakes() {
+        if !args.no_nix && !nix::inside_wrap() && nix::check_flakes() {
             resolve(nix::wrap(&nix_config));
             return;
         }
