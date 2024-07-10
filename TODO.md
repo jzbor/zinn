@@ -1,5 +1,5 @@
 # TODOs
-- [ ] Non-bars mode
+- [x] Non-bars mode
 - [x] Default values
 - [x] Flake
 - [x] Rename constants?

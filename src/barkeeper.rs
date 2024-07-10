@@ -22,6 +22,7 @@ pub trait ThreadStateTracker: Send {
     fn job_completed(&self);
     fn start(&self);
     fn set_prefix(&mut self, prefix: String);
+    fn clear_status(&mut self);
 }
 
 #[cfg(feature = "progress")]
@@ -127,6 +128,8 @@ impl ThreadStateTracker for DummyThreadBarkeeper {
     fn set_prefix(&mut self, prefix: String) {
         self.status_writer.0 = prefix;
     }
+
+    fn clear_status(&mut self) {}
 }
 
 #[cfg(feature = "progress")]
@@ -151,6 +154,10 @@ impl ThreadStateTracker for ThreadBarkeeper {
 
     fn set_prefix(&mut self, prefix: String) {
         self.bar.set_prefix(prefix)
+    }
+
+    fn clear_status(&mut self) {
+        self.bar.set_message("");
     }
 }
 

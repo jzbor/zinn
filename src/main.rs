@@ -196,7 +196,7 @@ where
 
         // enter nix wrap if desired
         if !args.no_nix && !nix::inside_wrap() && nix::check_flakes() {
-            resolve(nix::wrap(&nix_config));
+            resolve(nix::wrap(nix_config));
             return;
         }
     }
