@@ -85,7 +85,7 @@ fn lst_re(h: &Helper, _: &Handlebars, _: &Context, _: &mut RenderContext, out: &
     let pattern = h.params().get(1).unwrap().value().render();
     let replacement = h.params().get(2).unwrap().value().render();
 
-    let re = regex::Regex::new(&pattern)
+    let re = regex_lite::Regex::new(&pattern)
         .map_err(|e| RenderErrorReason::Other(format!("regex error - {e}")))?;
 
     let result: Vec<String> = list.iter()
@@ -144,7 +144,7 @@ fn re(h: &Helper, _: &Handlebars, _: &Context, _: &mut RenderContext, out: &mut 
     let pattern = h.params().get(1).unwrap().value().render();
     let replacement = h.params().get(2).unwrap().value().render();
 
-    let re = regex::Regex::new(&pattern)
+    let re = regex_lite::Regex::new(&pattern)
         .map_err(|e| RenderErrorReason::Other(format!("regex error - {e}")))?;
 
     let result = re.replace_all(&base, &replacement);

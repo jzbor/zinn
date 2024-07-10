@@ -38,7 +38,7 @@ pub enum ZinnError {
 
     #[cfg(feature = "regex")]
     #[error("Unable to parse regex - {0}")]
-    RegexError(#[from] regex::Error),
+    RegexError(#[from] regex_lite::Error),
 }
 
 pub fn die(e: impl Into<ZinnError>) -> ! {
