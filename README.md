@@ -63,3 +63,8 @@ Zinn provides custom functions for the templating language:
 - `re <base> <pattern> <replacement>`: Apply a regex replacement operation to an input string
 - `shell <cmd>`: Create a string from the output of a shell command
 - `subst <base> <pattern> <replacement>`: Replace all occurrences of a substring
+
+## Nix Support
+If **Nix is installed** and **Flakes are enabled**, it is possible to specify build dependencies in the `nix.packages` field of the Zinnfile.
+All jobs are then run inside a environment containing these packages.
+Please note however that Flakes are currently an unstable feature in Nix, so this feature should be considered unstable as well.
