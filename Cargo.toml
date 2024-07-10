@@ -2,6 +2,11 @@
 name = "zinn"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "Manage build jobs for projects in YAML files"
+homepage = "https://github.com/jzbor/zinn"
+repository = "https://github.com/jzbor/zinn"
+README = "./README.md"
 
 [dependencies]
 clap = { version = "4.5.8", features = ["derive"] }
