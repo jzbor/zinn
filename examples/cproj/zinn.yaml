@@ -45,7 +45,7 @@ jobs:
 
   clean:
     run: |
-      rm -rf *.o
+      rm -rf {{BUILDDIR}}
       rm -rf {{BIN}}
 
   default:
