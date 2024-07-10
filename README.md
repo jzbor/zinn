@@ -21,22 +21,22 @@ jobs:
     args: [path]
     inputs: "{{path}}"
     outputs: "{{subst path '.c' '.o'}}"
-    run: {{CC}} {{CFLAGS}} -c {{path}}
+    run: "{{CC}} {{CFLAGS}} -c {{path}}"
 
   binary:
     requires:
       - job: object
         with:
-    path: math.c
+          path: math.c
       - job: object
         with:
-    path: output.c
+          path: output.c
       - job: object
         with:
-    path: main.c
+          path: main.c
     inputs: math.c output.c main.c
     outputs: program
-    run: {{CC}} {{CFLAGS}} -o program
+    run: "{{CC}} {{CFLAGS}} -o program"
 
   clean:
     run: |
