@@ -68,3 +68,9 @@ Zinn provides custom functions for the templating language:
 If **Nix is installed** and **Flakes are enabled**, it is possible to specify build dependencies in the `nix.packages` field of the Zinnfile.
 All jobs are then run inside a environment containing these packages.
 Please note however that Flakes are currently an unstable feature in Nix, so this feature should be considered unstable as well.
+
+## Installation
+You can install Zinn directly from [crates.io](https://crates.io/crates/zinn):
+1. [Make sure you have a working installation of Rust](https://www.rust-lang.org/tools/install)
+2. [Install the crate with cargo](https://doc.rust-lang.org/book/ch14-04-installing-binaries.html)
+3. [Add the path (e.g. `~/.cargo/bin`) to your `$PATH` variable (e.g. in `.profile` or `.bashrc`). You may have to log out or restart for the change to apply.](https://www.cyberciti.biz/faq/how-to-add-to-bash-path-permanently-on-linux/)
