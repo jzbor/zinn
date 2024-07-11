@@ -7,6 +7,11 @@ use crate::{NixConfig, ZinnResult};
 const NIX_ENV_MARKER: &str = "ZINN_NIX_ENV";
 
 
+fn to_flake_parameters(packages: &[String]) -> impl Iterator<Item = String> + '_ {
+    packages.iter()
+        .map(|p| format!("nixpkgs#{}", p))
+}
+
 pub fn check_flakes() -> bool {
     Command::new("nix")
         .arg("shell")
@@ -18,11 +23,9 @@ pub fn check_flakes() -> bool {
 }
 
 pub fn enter_shell(nix_config: &NixConfig) -> ZinnResult<()>{
-    let packages = nix_config.packages.iter()
-        .map(|p| format!("nixpkgs#{}", p));
     Command::new("nix")
         .arg("shell")
-        .args(packages)
+        .args(to_flake_parameters(&nix_config.packages))
         .arg("--command")
         .arg(env::var("SHELL").unwrap_or(String::from("sh")))
         .env("name", "zinn")
@@ -32,11 +35,9 @@ pub fn enter_shell(nix_config: &NixConfig) -> ZinnResult<()>{
 }
 
 pub fn run(nix_config: &NixConfig, cmd: &str) -> ZinnResult<()>{
-    let packages = nix_config.packages.iter()
-        .map(|p| format!("nixpkgs#{}", p));
     Command::new("nix")
         .arg("shell")
-        .args(packages)
+        .args(to_flake_parameters(&nix_config.packages))
         .arg("--command")
         .arg("sh")
         .arg("-c")
@@ -48,11 +49,9 @@ pub fn run(nix_config: &NixConfig, cmd: &str) -> ZinnResult<()>{
 }
 
 pub fn wrap(nix_config: &NixConfig) -> ZinnResult<()>{
-    let packages = nix_config.packages.iter()
-        .map(|p| format!("nixpkgs#{}", p));
     Command::new("nix")
         .arg("shell")
-        .args(packages)
+        .args(to_flake_parameters(&nix_config.packages))
         .arg("--command")
         .args(env::args())
         .env(NIX_ENV_MARKER, "1")
