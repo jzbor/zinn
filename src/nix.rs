@@ -31,6 +31,22 @@ pub fn enter_shell(nix_config: &NixConfig) -> ZinnResult<()>{
     Ok(())
 }
 
+pub fn run(nix_config: &NixConfig, cmd: &str) -> ZinnResult<()>{
+    let packages = nix_config.packages.iter()
+        .map(|p| format!("nixpkgs#{}", p));
+    Command::new("nix")
+        .arg("shell")
+        .args(packages)
+        .arg("--command")
+        .arg("sh")
+        .arg("-c")
+        .arg(cmd)
+        .env("name", "zinn")
+        .env(NIX_ENV_MARKER, "1")
+        .status()?;
+    Ok(())
+}
+
 pub fn wrap(nix_config: &NixConfig) -> ZinnResult<()>{
     let packages = nix_config.packages.iter()
         .map(|p| format!("nixpkgs#{}", p));

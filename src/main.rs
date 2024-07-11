@@ -85,6 +85,10 @@ struct Args {
     /// Don't run jobs in a nix shell
     #[clap(long)]
     no_nix: bool,
+
+    /// Run a command in a shell environment containing the specified Nix packages
+    #[clap(long)]
+    nix_run: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -189,9 +193,17 @@ where
     // Nix features
     if let Some(nix_config) = &zinnfile.nix {
         // --nix-shell
-        if !nix::inside_wrap() && args.nix_shell {
+        if args.nix_shell && !nix::inside_wrap() && nix::check_flakes() {
             resolve(nix::enter_shell(nix_config));
             return;
+        }
+
+        // --nix-run
+        if let Some(cmd) = &args.nix_run {
+            if !nix::inside_wrap() && nix::check_flakes() {
+                resolve(nix::run(nix_config, cmd));
+                return;
+            }
         }
 
         // enter nix wrap if desired
