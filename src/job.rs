@@ -51,6 +51,10 @@ pub struct JobDescription {
     /// Output files as native list
     #[serde(default)]
     output_list: Vec<String>,
+
+    /// Run job in interactive mode
+    #[serde(default)]
+    interactive: bool,
 }
 
 /// Executable job with dependencies resolved and all variables applied
@@ -58,6 +62,7 @@ pub struct JobDescription {
 pub struct InnerJobRealization {
     name: String,
     run: String,
+    interactive: bool,
     param_values: Vec<String>,  // for info/debugging purposes
     dependencies: Vec<JobRealization>,
     inputs: Vec<String>,
@@ -166,14 +171,20 @@ impl JobDescription {
 
         let run = handlebars.render_template(&self.run, &combined_vars)?;
         let name = name.replace('\n', "");
+        let interactive = self.interactive;
 
         Ok(Arc::new(InnerJobRealization {
-            name, run, dependencies, inputs, outputs, param_values,
+            name, run, dependencies, inputs, outputs, param_values, interactive
         }))
     }
 
     pub fn args(&self) -> &Vec<String> {
         &self.args
+    }
+
+    #[cfg(feature = "progress")]
+    pub fn is_interactive(&self) -> bool {
+        self.interactive
     }
 }
 
@@ -222,31 +233,40 @@ impl InnerJobRealization {
             let _ = writeln!(tracker.out(), "{}", self.cmd());
         }
 
-        let (io_reader, io_writer) = os_pipe::pipe()?;
         let cmd_with_exit_setting = format!("set -e; {}", self.run);
-        let mut process = Command::new("sh")
-            .arg("-c")
-            .arg(cmd_with_exit_setting)
-            .stdout(io_writer.try_clone()?)
-            .stderr(io_writer)
-            .spawn()?;
+        let mut  process = if self.interactive {
+            // run job interactively
+            Command::new("sh")
+                .arg("-c")
+                .arg(&cmd_with_exit_setting)
+                .spawn()?
+        } else {
+            // run job without user interaction and track output
+            let (io_reader, io_writer) = os_pipe::pipe()?;
+            let process = Command::new("sh")
+                .arg("-c")
+                .arg(&cmd_with_exit_setting)
+                .stdout(io_writer.try_clone()?)
+                .stderr(io_writer)
+                .spawn()?;
 
+            let mut last_line: Option<String> = None;
+            for line in BufReader::new(io_reader).lines().map_while(Result::ok) {
+                let _ = writeln!(tracker.status(), "{}", line);
 
-        let mut last_line: Option<String> = None;
-
-        for line in BufReader::new(io_reader).lines().map_while(Result::ok) {
-            let _ = writeln!(tracker.status(), "{}", line);
-
-            if options.verbose {
-                if let Some(line) = last_line.take() {
-                    let _ = writeln!(tracker.out(), "{}: {}", self, line);
+                if options.verbose {
+                    if let Some(line) = last_line.take() {
+                        let _ = writeln!(tracker.out(), "{}: {}", self, line);
+                    }
+                    last_line = Some(line);
                 }
-                last_line = Some(line);
             }
-        }
-        if let Some(line) = last_line.take() {
-            let _ = writeln!(tracker.out(), "{}: {}", self, line);
-        }
+            if let Some(line) = last_line.take() {
+                let _ = writeln!(tracker.out(), "{}: {}", self, line);
+            }
+
+            process
+        };
 
         let status = process.wait()?;
 

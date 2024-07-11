@@ -157,10 +157,60 @@ where
 }
 
 
-fn main_with_barkeeper<T: StateTracker>(barkeeper: T, args: Args)
+fn run<T: StateTracker>(barkeeper: T, zinnfile: Zinnfile, nthreads: usize, constants: &HashMap<String, String>,
+                        handlebars: Handlebars, args: Args)
 where
     <T as StateTracker>::ThreadStateTracker: 'static
 {
+
+    // setup bars
+    let mut thread_barkeepers = barkeeper.for_threads(nthreads);
+
+    // feed the queue
+    let queue = Queue::new();
+    let parameters = args.param.iter().cloned().collect();
+    for name in &args.targets {
+        let job = match zinnfile.jobs.get(name) {
+            Some(job) => resolve(job.realize(name, &zinnfile.jobs, &handlebars, &constants, &parameters)),
+            None => resolve(Err(ZinnError::JobNotFound(name.to_owned()))),
+        };
+        for dep in job.transitive_dependencies() {
+            queue.enqueue(dep);
+        }
+        queue.enqueue(job);
+    }
+
+    barkeeper.set_njobs(queue.len());
+
+    // start worker bars
+    for tb in &thread_barkeepers {
+        tb.start();
+    }
+
+    // start the threads
+    let threads: Vec<_> = (0..nthreads).map(|_| {
+        let queue = queue.clone();
+        let tb: T::ThreadStateTracker = thread_barkeepers.pop().unwrap();
+        let options = args.options();
+
+        thread::spawn(move || {
+            worker::run_worker(queue, tb, options)
+        })
+    }).collect();
+
+    // enable the main bar
+    barkeeper.start();
+
+    // wait for the work to be completed
+    queue.done();
+    for thread in threads {
+        let _ = thread.join();
+    }
+}
+
+fn main() {
+    let args = Args::parse();
+
     // process arguments
     if args.docs {
         let result = std::process::Command::new("xdg-open")
@@ -231,61 +281,16 @@ where
         constants.insert(name.to_owned(), realized);
     }
 
-    // setup bars
-    let mut thread_barkeepers = barkeeper.for_threads(nthreads);
-
-    // feed the queue
-    let queue = Queue::new();
-    let parameters = args.param.iter().cloned().collect();
-    for name in &args.targets {
-        let job = match zinnfile.jobs.get(name) {
-            Some(job) => resolve(job.realize(name, &zinnfile.jobs, &handlebars, &constants, &parameters)),
-            None => resolve(Err(ZinnError::JobNotFound(name.to_owned()))),
-        };
-        for dep in job.transitive_dependencies() {
-            queue.enqueue(dep);
-        }
-        queue.enqueue(job);
-    }
-
-    barkeeper.set_njobs(queue.len());
-
-    // start worker bars
-    for tb in &thread_barkeepers {
-        tb.start();
-    }
-
-    // start the threads
-    let threads: Vec<_> = (0..nthreads).map(|_| {
-        let queue = queue.clone();
-        let tb: T::ThreadStateTracker = thread_barkeepers.pop().unwrap();
-        let options = args.options();
-
-        thread::spawn(move || {
-            worker::run_worker(queue, tb, options)
-        })
-    }).collect();
-
-    // enable the main bar
-    barkeeper.start();
-
-    // wait for the work to be completed
-    queue.done();
-    for thread in threads {
-        let _ = thread.join();
-    }
-}
-
-fn main() {
-    let args = Args::parse();
+    #[cfg(feature = "progress")]
+    let has_interactive_jobs = |zf: &Zinnfile| zf.jobs.values().find(|j| j.is_interactive()).is_some();
 
     #[cfg(feature = "progress")]
-    if args.no_progress {
-        main_with_barkeeper(barkeeper::DummyBarkeeper::new(), args)
+    if args.no_progress || has_interactive_jobs(&zinnfile) {
+        run(barkeeper::DummyBarkeeper::new(), zinnfile, nthreads, &constants, handlebars, args);
     } else {
-        main_with_barkeeper(barkeeper::Barkeeper::new(), args)
+        run(barkeeper::Barkeeper::new(), zinnfile, nthreads, &constants, handlebars, args);
     }
 
     #[cfg(not(feature = "progress"))]
-    main_with_barkeeper(barkeeper::DummyBarkeeper::new(), args)
+    run(barkeeper::DummyBarkeeper::new(), zinnfile, nthreads, &constants, handlebars, args);
 }
