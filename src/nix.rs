@@ -10,7 +10,7 @@ const NIX_ENV_MARKER: &str = "ZINN_NIX_ENV";
 fn to_flake_parameters<'a>(nix_config: &'a NixConfig, packages: &'a[String]) -> impl Iterator<Item = String> + 'a {
     packages.iter()
         .map(|p| {
-            if p.contains("#") {
+            if p.contains('#') {
                 p.clone()
             } else {
                 format!("{}#{}", nix_config.nixpkgs, p)
