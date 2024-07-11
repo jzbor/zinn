@@ -67,7 +67,9 @@ Zinn provides custom functions for the templating language:
 ## Nix Support
 If **Nix is installed** and **Flakes are enabled**, it is possible to specify build dependencies in the `nix.packages` field of the Zinnfile.
 All jobs are then run inside a environment containing these packages.
-Please note however that Flakes are currently an unstable feature in Nix, so this feature should be considered unstable as well.
+It is possible to change the default nixpkgs flake reference with the `nix.nixpkgs` field.
+
+*Please note that Flakes are currently an unstable feature in Nix, so this feature should be considered unstable as well.*
 
 ## Installation
 You can install Zinn directly from [crates.io](https://crates.io/crates/zinn):

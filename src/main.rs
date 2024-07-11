@@ -122,6 +122,11 @@ struct Zinnfile {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct NixConfig {
+    /// Flake reference to a flake providing the required packages
+    #[serde(default = "nix::default_nixpkgs")]
+    nixpkgs: String,
+
+    /// Nix packages to add to the execution environment
     packages: Vec<String>,
 }
 
