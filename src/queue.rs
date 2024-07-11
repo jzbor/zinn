@@ -83,6 +83,10 @@ impl Queue {
     pub fn len(&self) -> usize {
         self.inner.lock().unwrap().jobs.len()
     }
+
+    pub fn has_interactive(&self) -> bool {
+        self.inner.lock().unwrap().jobs.iter().find(|j| j.is_interactive()).is_some()
+    }
 }
 
 impl InnerQueue {

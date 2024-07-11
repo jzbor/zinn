@@ -157,29 +157,13 @@ where
 }
 
 
-fn run<T: StateTracker>(barkeeper: T, zinnfile: Zinnfile, nthreads: usize, constants: &HashMap<String, String>,
-                        handlebars: Handlebars, args: Args)
+fn run<T: StateTracker>(barkeeper: T, nthreads: usize, queue: Queue, args: Args)
 where
     <T as StateTracker>::ThreadStateTracker: 'static
 {
 
     // setup bars
     let mut thread_barkeepers = barkeeper.for_threads(nthreads);
-
-    // feed the queue
-    let queue = Queue::new();
-    let parameters = args.param.iter().cloned().collect();
-    for name in &args.targets {
-        let job = match zinnfile.jobs.get(name) {
-            Some(job) => resolve(job.realize(name, &zinnfile.jobs, &handlebars, &constants, &parameters)),
-            None => resolve(Err(ZinnError::JobNotFound(name.to_owned()))),
-        };
-        for dep in job.transitive_dependencies() {
-            queue.enqueue(dep);
-        }
-        queue.enqueue(job);
-    }
-
     barkeeper.set_njobs(queue.len());
 
     // start worker bars
@@ -281,16 +265,27 @@ fn main() {
         constants.insert(name.to_owned(), realized);
     }
 
-    #[cfg(feature = "progress")]
-    let has_interactive_jobs = |zf: &Zinnfile| zf.jobs.values().find(|j| j.is_interactive()).is_some();
+    // feed the queue
+    let queue = Queue::new();
+    let parameters = args.param.iter().cloned().collect();
+    for name in &args.targets {
+        let job = match zinnfile.jobs.get(name) {
+            Some(job) => resolve(job.realize(name, &zinnfile.jobs, &handlebars, &constants, &parameters)),
+            None => resolve(Err(ZinnError::JobNotFound(name.to_owned()))),
+        };
+        for dep in job.transitive_dependencies() {
+            queue.enqueue(dep);
+        }
+        queue.enqueue(job);
+    }
 
     #[cfg(feature = "progress")]
-    if args.no_progress || has_interactive_jobs(&zinnfile) {
-        run(barkeeper::DummyBarkeeper::new(), zinnfile, nthreads, &constants, handlebars, args);
+    if args.no_progress || queue.has_interactive() {
+        run(barkeeper::DummyBarkeeper::new(), nthreads, queue, args);
     } else {
-        run(barkeeper::Barkeeper::new(), zinnfile, nthreads, &constants, handlebars, args);
+        run(barkeeper::Barkeeper::new(), nthreads, queue, args);
     }
 
     #[cfg(not(feature = "progress"))]
-    run(barkeeper::DummyBarkeeper::new(), zinnfile, nthreads, &constants, handlebars, args);
+    run(barkeeper::DummyBarkeeper::new(), nthreads, args);
 }

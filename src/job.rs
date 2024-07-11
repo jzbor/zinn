@@ -118,6 +118,32 @@ impl JobDescription {
             }
         }
 
+        // render input files
+        let mut inputs = Vec::new();
+        if let Some(input_str) = &self.inputs {
+            let rendered_input_str = handlebars.render_template(input_str, &combined_vars)?;
+            let additional_inputs = rendered_input_str.split(char::is_whitespace)
+                .filter(|v| !v.is_empty())
+                .map(|s| s.to_owned());
+            inputs.extend(additional_inputs)
+        }
+        for input in &self.input_list {
+            inputs.push(handlebars.render_template(input, &combined_vars)?);
+        }
+
+        // render output files
+        let mut outputs = Vec::new();
+        if let Some(output_str) = &self.outputs {
+            let rendered_output_str = handlebars.render_template(output_str, &combined_vars)?;
+            let additional_outputs = rendered_output_str .split(char::is_whitespace)
+                .filter(|v| !v.is_empty())
+                .map(|s| s.to_owned());
+            outputs.extend(additional_outputs)
+        }
+        for output in &self.output_list {
+            outputs.push(handlebars.render_template(output, &combined_vars)?);
+        }
+
         for dep in &self.requires {
             let mut realized_dep_desc = dep.with.clone();
             for val in realized_dep_desc.values_mut() {
@@ -146,29 +172,6 @@ impl JobDescription {
             }
         }
 
-        let mut inputs = Vec::new();
-        if let Some(input_str) = &self.inputs {
-            let rendered_input_str = handlebars.render_template(input_str, &combined_vars)?;
-            let additional_inputs = rendered_input_str.split(char::is_whitespace)
-                .filter(|v| !v.is_empty())
-                .map(|s| s.to_owned());
-            inputs.extend(additional_inputs)
-        }
-        for input in &self.input_list {
-            inputs.push(handlebars.render_template(input, &combined_vars)?);
-        }
-        let mut outputs = Vec::new();
-        if let Some(output_str) = &self.outputs {
-            let rendered_output_str = handlebars.render_template(output_str, &combined_vars)?;
-            let additional_outputs = rendered_output_str .split(char::is_whitespace)
-                .filter(|v| !v.is_empty())
-                .map(|s| s.to_owned());
-            outputs.extend(additional_outputs)
-        }
-        for output in &self.output_list {
-            outputs.push(handlebars.render_template(output, &combined_vars)?);
-        }
-
         let run = handlebars.render_template(&self.run, &combined_vars)?;
         let name = name.replace('\n', "");
         let interactive = self.interactive;
@@ -180,11 +183,6 @@ impl JobDescription {
 
     pub fn args(&self) -> &Vec<String> {
         &self.args
-    }
-
-    #[cfg(feature = "progress")]
-    pub fn is_interactive(&self) -> bool {
-        self.interactive
     }
 }
 
@@ -207,23 +205,7 @@ impl InnerJobRealization {
 
         // check if any input file is newer than any output file
         if !options.force && !self.inputs.is_empty() && !self.outputs.is_empty() {
-            let mut dirty = false;
-            for output in &self.outputs {
-                if !Path::new(output).exists() {
-                    dirty = true;
-                    break;
-                }
-
-                for input in &self.inputs {
-                    let out_time = fs::metadata(output)?.modified()?;
-                    let in_time = fs::metadata(input)?.modified()?;
-                    if in_time > out_time {
-                        dirty = true;
-                        break;
-                    }
-                }
-            }
-            if !dirty {
+            if check_file_skip(&self.inputs, &self.outputs)? {
                 return Ok(JobState::Skipped);
             }
         }
@@ -261,8 +243,10 @@ impl InnerJobRealization {
                     last_line = Some(line);
                 }
             }
-            if let Some(line) = last_line.take() {
-                let _ = writeln!(tracker.out(), "{}: {}", self, line);
+            if options.verbose {
+                if let Some(line) = last_line.take() {
+                    let _ = writeln!(tracker.out(), "{}: {}", self, line);
+                }
             }
 
             process
@@ -303,6 +287,10 @@ impl InnerJobRealization {
     pub fn cmd(&self) -> &str {
         &self.run
     }
+
+    pub fn is_interactive(&self) -> bool {
+        self.interactive
+    }
 }
 
 
@@ -314,4 +302,22 @@ impl fmt::Display for InnerJobRealization {
         }
         Ok(())
     }
+}
+
+fn check_file_skip(inputs: &[String], outputs: &[String]) -> ZinnResult<bool> {
+    for output in outputs {
+        if !Path::new(output).exists() {
+            return Ok(false);
+        }
+
+        for input in inputs {
+            let out_time = fs::metadata(output)?.modified()?;
+            let in_time = fs::metadata(input)?.modified()?;
+            if in_time > out_time {
+                return Ok(false);
+            }
+        }
+    }
+
+    Ok(true)
 }
