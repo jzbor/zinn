@@ -197,15 +197,11 @@ impl InnerJobRealization {
         }
 
         // check if all input files exist
-        for file in &self.inputs {
-            if !Path::new(file).exists() {
-                return Err(ZinnError::InputFileError(file.to_owned()));
-            }
-        }
+        self.check_input_files()?;
 
         // check if any input file is newer than any output file
         if !options.force && !self.inputs.is_empty() && !self.outputs.is_empty() {
-            if check_file_skip(&self.inputs, &self.outputs)? {
+            if self.check_file_skip()? {
                 return Ok(JobState::Skipped);
             }
         }
@@ -270,6 +266,35 @@ impl InnerJobRealization {
         }
     }
 
+    fn check_input_files(&self) -> ZinnResult<()> {
+        for file in &self.inputs {
+            if !Path::new(file).exists() {
+                return Err(ZinnError::InputFileError(file.to_owned()));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn check_file_skip(&self) -> ZinnResult<bool> {
+        self.check_input_files()?;
+        for output in &self.outputs {
+            if !Path::new(output).exists() {
+                return Ok(false);
+            }
+
+            for input in &self.inputs {
+                let out_time = fs::metadata(output)?.modified()?;
+                let in_time = fs::metadata(input)?.modified()?;
+                if in_time > out_time {
+                    return Ok(false);
+                }
+            }
+        }
+
+        Ok(true)
+    }
+
     pub fn dependencies(&self) -> Vec<JobRealization> {
         self.dependencies.clone()
     }
@@ -302,22 +327,4 @@ impl fmt::Display for InnerJobRealization {
         }
         Ok(())
     }
-}
-
-fn check_file_skip(inputs: &[String], outputs: &[String]) -> ZinnResult<bool> {
-    for output in outputs {
-        if !Path::new(output).exists() {
-            return Ok(false);
-        }
-
-        for input in inputs {
-            let out_time = fs::metadata(output)?.modified()?;
-            let in_time = fs::metadata(input)?.modified()?;
-            if in_time > out_time {
-                return Ok(false);
-            }
-        }
-    }
-
-    Ok(true)
 }

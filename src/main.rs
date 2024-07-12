@@ -7,7 +7,8 @@ use queue::Queue;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
-use std::{fs, thread};
+use std::path::Path;
+use std::{env, fs, thread};
 
 use error::*;
 use job::*;
@@ -251,6 +252,12 @@ fn main() {
             return;
         }
     }
+
+    // change directory (must happen before resolving templates)
+    let parent = Path::new(&args.file)
+        .parent()
+        .ok_or(ZinnError::ChdirError());
+    resolve(env::set_current_dir(resolve(parent)));
 
     // init template engine
     let mut handlebars = Handlebars::new();

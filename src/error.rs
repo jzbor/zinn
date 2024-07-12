@@ -39,6 +39,9 @@ pub enum ZinnError {
     #[cfg(feature = "regex")]
     #[error("Unable to parse regex - {0}")]
     RegexError(#[from] regex_lite::Error),
+
+    #[error("Unable to change directory")]
+    ChdirError(),
 }
 
 pub fn die(e: impl Into<ZinnError>) -> ! {
