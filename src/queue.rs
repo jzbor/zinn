@@ -84,6 +84,7 @@ impl Queue {
         self.inner.lock().unwrap().jobs.len()
     }
 
+    #[cfg(feature = "progress")]
     pub fn has_interactive(&self) -> bool {
         self.inner.lock().unwrap().jobs.iter().any(|j| j.is_interactive())
     }

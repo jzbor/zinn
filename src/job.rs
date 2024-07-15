@@ -311,6 +311,7 @@ impl InnerJobRealization {
         &self.run
     }
 
+    #[cfg(feature = "progress")]
     pub fn is_interactive(&self) -> bool {
         self.interactive
     }

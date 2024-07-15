@@ -294,5 +294,5 @@ fn main() {
     }
 
     #[cfg(not(feature = "progress"))]
-    run(barkeeper::DummyBarkeeper::new(), nthreads, args);
+    run(barkeeper::DummyBarkeeper::new(), nthreads, queue, args);
 }
