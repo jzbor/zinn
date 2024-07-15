@@ -200,10 +200,8 @@ impl InnerJobRealization {
         self.check_input_files()?;
 
         // check if any input file is newer than any output file
-        if !options.force && !self.inputs.is_empty() && !self.outputs.is_empty() {
-            if self.check_file_skip()? {
-                return Ok(JobState::Skipped);
-            }
+        if !options.force && !self.inputs.is_empty() && !self.outputs.is_empty() && self.check_file_skip()? {
+            return Ok(JobState::Skipped);
         }
 
         // print out trace
