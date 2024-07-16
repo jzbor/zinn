@@ -254,7 +254,8 @@ fn main() {
     }
 
     // change directory (must happen before resolving templates)
-    let parent = Path::new(&args.file)
+    let canonic_zinn_path = resolve(Path::new(&args.file).canonicalize());
+    let parent = canonic_zinn_path
         .parent()
         .ok_or(ZinnError::ChdirError());
     resolve(env::set_current_dir(resolve(parent)));
