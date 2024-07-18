@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::fmt::{self, Write};
+use std::fmt;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -191,7 +191,7 @@ impl InnerJobRealization {
         // skip if dry run
         if options.dry_run {
             if options.trace {
-                let _ = writeln!(tracker.out(), "{}", self.cmd());
+                tracker.trace(self.cmd());
             }
             return Ok(JobState::Finished);
         }
@@ -206,7 +206,7 @@ impl InnerJobRealization {
 
         // print out trace
         if options.trace {
-            let _ = writeln!(tracker.out(), "{}", self.cmd());
+            tracker.trace(self.cmd());
         }
 
         let cmd_with_exit_setting = format!("set -e; {}", self.run);
@@ -226,22 +226,10 @@ impl InnerJobRealization {
                 .stderr(io_writer)
                 .spawn()?;
 
-            let mut last_line: Option<String> = None;
             for line in BufReader::new(io_reader).lines().map_while(Result::ok) {
-                let _ = writeln!(tracker.status(), "{}", line);
-
-                if options.verbose {
-                    if let Some(line) = last_line.take() {
-                        let _ = writeln!(tracker.out(), "{}: {}", self, line);
-                    }
-                    last_line = Some(line);
-                }
+                tracker.cmd_output(&self.to_string(), &line, options.verbose);
             }
-            if options.verbose {
-                if let Some(line) = last_line.take() {
-                    let _ = writeln!(tracker.out(), "{}: {}", self, line);
-                }
-            }
+            tracker.flush_cmd_output(&self.to_string(), options.verbose);
 
             process
         };

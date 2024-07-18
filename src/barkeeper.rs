@@ -1,12 +1,4 @@
-use std::fmt::Write;
-
-
-#[cfg(feature = "progress")]
-struct BarMessageWriter(String, indicatif::ProgressBar);
-#[cfg(feature = "progress")]
-struct BarPrintWriter(String, indicatif::ProgressBar);
-struct DummyOutWriter();
-struct DummyStatusWriter(String, String);
+use crate::{queue::JobState, JobRealization};
 
 
 pub trait StateTracker {
@@ -17,12 +9,13 @@ pub trait StateTracker {
 }
 
 pub trait ThreadStateTracker: Send {
-    fn out(&mut self) -> &mut impl Write;
-    fn status(&mut self) -> &mut impl Write;
-    fn job_completed(&self);
+    fn job_completed(&self, job: JobRealization, state: JobState);
     fn start(&self);
     fn set_prefix(&mut self, prefix: String);
     fn clear_status(&mut self);
+    fn cmd_output(&mut self, job: &str, out: &str, verbose: bool);
+    fn flush_cmd_output(&mut self, job: &str, verbose: bool);
+    fn trace(&mut self, cmd: &str);
 }
 
 #[cfg(feature = "progress")]
@@ -33,18 +26,14 @@ pub struct Barkeeper {
 
 #[cfg(feature = "progress")]
 pub struct ThreadBarkeeper {
-    message_writer: BarMessageWriter,
-    print_writer: BarPrintWriter,
     mp: indicatif::MultiProgress,
     bar: indicatif::ProgressBar,
     main_bar: indicatif::ProgressBar,
+    last_line: Option<String>,
 }
 
 pub struct DummyBarkeeper {}
-pub struct DummyThreadBarkeeper {
-    out_writer: DummyOutWriter,
-    status_writer: DummyStatusWriter,
-}
+pub struct DummyThreadBarkeeper {}
 
 
 #[cfg(feature = "progress")]
@@ -85,11 +74,10 @@ impl StateTracker for Barkeeper {
             bar.set_style(indicatif::ProgressStyle::with_template("{spinner} {prefix:.cyan} {wide_msg}").unwrap());
 
             ThreadBarkeeper {
-                message_writer: BarMessageWriter(String::new(), bar.clone()),
-                print_writer: BarPrintWriter(String::new(), bar.clone()),
                 mp: self.mp.clone(),
                 main_bar: self.bar.clone(),
                 bar,
+                last_line: None,
             }
 
         }).collect()
@@ -105,50 +93,43 @@ impl StateTracker for DummyBarkeeper {
 
     fn for_threads(&self, nthreads: usize) -> Vec<DummyThreadBarkeeper> {
         (0..nthreads).map(|_| {
-            let out_writer = DummyOutWriter();
-            let status_writer = DummyStatusWriter(String::new(), String::new());
-            DummyThreadBarkeeper { out_writer, status_writer }
+            DummyThreadBarkeeper {}
         }).collect()
     }
 }
 
 impl ThreadStateTracker for DummyThreadBarkeeper {
-    fn out(&mut self) -> &mut impl Write {
-        &mut self.out_writer
+    fn job_completed(&self, job: JobRealization, state: JobState) {
+        println!("{}", job_finished_msg(job, state));
     }
-
-    fn status(&mut self) -> &mut impl Write {
-        &mut self.status_writer
-    }
-
-    fn job_completed(&self) {}
 
     fn start(&self) {}
 
-    fn set_prefix(&mut self, prefix: String) {
-        self.status_writer.0 = prefix;
-    }
+    fn set_prefix(&mut self, _prefix: String) {}
 
     fn clear_status(&mut self) {}
+
+    fn cmd_output(&mut self, job: &str, out: &str, _verbose: bool) {
+        println!("{}: {}", job, out);
+    }
+
+    fn flush_cmd_output(&mut self, _job: &str, _verbose: bool) {}
+
+    fn trace(&mut self, cmd: &str) {
+        println!("{}", cmd);
+    }
 }
 
 #[cfg(feature = "progress")]
 impl ThreadStateTracker for ThreadBarkeeper {
-    fn out(&mut self) -> &mut impl Write {
-        &mut self.print_writer
-    }
-
-    fn status(&mut self) -> &mut impl Write {
-        &mut self.message_writer
-    }
-
     fn start(&self) {
         self.mp.add(self.bar.clone());
         self.bar.tick();
         self.bar.enable_steady_tick(std::time::Duration::from_millis(75));
     }
 
-    fn job_completed(&self) {
+    fn job_completed(&self, job: JobRealization, state: JobState) {
+        self.bar.println(job_finished_msg(job, state));
         self.main_bar.inc(1)
     }
 
@@ -159,72 +140,37 @@ impl ThreadStateTracker for ThreadBarkeeper {
     fn clear_status(&mut self) {
         self.bar.set_message("");
     }
-}
 
+    fn cmd_output(&mut self, job: &str, out: &str, verbose: bool) {
+        self.bar.set_message(out.to_owned());
 
-#[cfg(feature = "progress")]
-impl Write for BarMessageWriter {
-    fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        for c in s.chars() {
-            self.write_char(c)?
+        if verbose {
+            if let Some(line) = self.last_line.take() {
+                self.bar.println(format!("{}: {}", job, line));
+            }
+            self.last_line = Some(out.to_owned());
         }
-        Ok(())
     }
 
-    fn write_char(&mut self, c: char) -> std::fmt::Result {
-        if c == '\n' {
-            let msg = self.0.clone();
-            self.1.set_message(msg);
-            self.0 = String::new();
-        } else {
-            self.0.push(c);
+    fn flush_cmd_output(&mut self, job: &str, verbose: bool) {
+        if verbose {
+            if let Some(line) = self.last_line.take() {
+                self.bar.println(format!("{}: {}", job, line));
+            }
         }
-        Ok(())
-    }
-}
-
-#[cfg(feature = "progress")]
-impl Write for BarPrintWriter {
-    fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        for c in s.chars() {
-            self.write_char(c)?
-        }
-        Ok(())
     }
 
-    fn write_char(&mut self, c: char) -> std::fmt::Result {
-        if c == '\n' {
-            self.1.println(&self.0);
-            self.0.clear();
-        } else {
-            self.0.push(c)
-        }
-        Ok(())
+    fn trace(&mut self, cmd: &str) {
+        self.bar.println(cmd);
     }
 }
 
-impl Write for DummyOutWriter {
-    fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        print!("{}", s);
-        Ok(())
-    }
-}
 
-impl Write for DummyStatusWriter {
-    fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        for c in s.chars() {
-            self.write_char(c)?
-        }
-        Ok(())
-    }
-
-    fn write_char(&mut self, c: char) -> std::fmt::Result {
-        if c == '\n' {
-            println!("{} {}", self.0, self.1);
-            self.1.clear();
-        } else {
-            self.1.push(c);
-        }
-        Ok(())
+fn job_finished_msg(job: JobRealization, state: JobState ) -> String {
+    match state {
+        JobState::Finished => console::style(format!("=> DONE {}", job)).green().to_string(),
+        JobState::Skipped => console::style(format!("=> SKIPPED {}", job)).yellow().to_string(),
+        JobState::Failed => console::style(format!("=> FAILED {}", job)).red().to_string(),
+        _ => panic!("Invalid job state after run: {:?}", state),
     }
 }

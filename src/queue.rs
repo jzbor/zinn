@@ -62,16 +62,12 @@ impl Queue {
         }
     }
 
-    pub fn finished(&self, finished_job: JobRealization) {
+    pub fn finished(&self, job: JobRealization, state: JobState) {
         let mut inner = self.inner.lock().unwrap();
-        inner.states.insert(finished_job, JobState::Finished);
-        self.cond_fetch_job.notify_all();
-    }
-
-    pub fn failed(&self, failed_job: JobRealization) {
-        let mut inner = self.inner.lock().unwrap();
-        inner.states.insert(failed_job, JobState::Failed);
-        inner.failed = true;
+        inner.states.insert(job, state);
+        if state == JobState::Failed {
+            inner.failed = true;
+        }
         self.cond_fetch_job.notify_all();
     }
 
