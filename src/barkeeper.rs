@@ -1,4 +1,4 @@
-use crate::{queue::JobState, JobRealization};
+use crate::{queue::JobState, JobRealization, ZinnError};
 
 
 pub trait StateTracker {
@@ -9,7 +9,7 @@ pub trait StateTracker {
 }
 
 pub trait ThreadStateTracker: Send {
-    fn job_completed(&self, job: JobRealization, state: JobState);
+    fn job_completed(&self, job: JobRealization, state: JobState, error: Option<ZinnError>);
     fn start(&self);
     fn set_prefix(&mut self, prefix: String);
     fn clear_status(&mut self);
@@ -99,8 +99,11 @@ impl StateTracker for DummyBarkeeper {
 }
 
 impl ThreadStateTracker for DummyThreadBarkeeper {
-    fn job_completed(&self, job: JobRealization, state: JobState) {
+    fn job_completed(&self, job: JobRealization, state: JobState, error: Option<ZinnError>) {
         println!("{}", job_finished_msg(job, state));
+        if let Some(e) = error {
+            println!("{}", e);
+        }
     }
 
     fn start(&self) {}
@@ -128,8 +131,11 @@ impl ThreadStateTracker for ThreadBarkeeper {
         self.bar.enable_steady_tick(std::time::Duration::from_millis(75));
     }
 
-    fn job_completed(&self, job: JobRealization, state: JobState) {
+    fn job_completed(&self, job: JobRealization, state: JobState, error: Option<ZinnError>) {
         self.bar.println(job_finished_msg(job, state));
+        if let Some(e) = error {
+            self.bar.println(e.to_string());
+        }
         self.main_bar.inc(1)
     }
 

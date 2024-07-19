@@ -7,7 +7,6 @@ use std::io::{BufRead, BufReader};
 use std::sync::Arc;
 
 use handlebars::Handlebars;
-use handlebars::Renderable;
 use serde::{Deserialize, Serialize};
 
 use crate::barkeeper::ThreadStateTracker;

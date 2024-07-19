@@ -155,7 +155,7 @@ enum TemplateType {
 
 
 impl TemplateType {
-    fn to_name(&self, suffix: &[&str; 3]) -> String {
+    fn to_name(self, suffix: &[&str; 3]) -> String {
         use TemplateType::*;
         // prefixes must not be the same or similar
         match self {
