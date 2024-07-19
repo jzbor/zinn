@@ -28,7 +28,10 @@ pub enum ZinnError {
     MissingArgument(String),
 
     #[error("Template rendering failed - ({0})")]
-    TemplateError(#[from] handlebars::RenderError),
+    RenderError(#[from] handlebars::RenderError),
+
+    #[error("Template rendering failed - ({0})")]
+    TemplateError(#[from] handlebars::TemplateError),
 
     #[error("Missing input file \"{0}\"")]
     InputFileError(String),

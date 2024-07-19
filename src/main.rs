@@ -142,6 +142,34 @@ impl Args {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+enum TemplateType {
+    Inputs,
+    InputListElem,
+    Outputs,
+    OutputListElem,
+    DependencyParam,
+    ForEach,
+    Run,
+}
+
+
+impl TemplateType {
+    fn to_name(&self, suffix: &[&str; 3]) -> String {
+        use TemplateType::*;
+        // prefixes must not be the same or similar
+        match self {
+            Inputs => format!("inputs-{}-{}-{}", suffix[0], suffix[1], suffix[2]),
+            InputListElem => format!("input-file-{}-{}-{}", suffix[0], suffix[1], suffix[2]),
+            Outputs => format!("outputs-{}-{}-{}", suffix[0], suffix[1], suffix[2]),
+            OutputListElem => format!("output-file-{}-{}-{}", suffix[0], suffix[1], suffix[2]),
+            DependencyParam => format!("dependency-param-{}-{}-{}", suffix[0], suffix[1], suffix[2]),
+            ForEach => format!("dependency-foreach-{}-{}-{}", suffix[0], suffix[1], suffix[2]),
+            Run => format!("run-{}-{}-{}", suffix[0], suffix[1], suffix[2]),
+        }
+    }
+}
+
 
 /// Parse a single key-value pair
 fn parse_key_val<T, U>(s: &str) -> Result<(T, U), Box<dyn Error + Send + Sync + 'static>>
@@ -278,7 +306,7 @@ fn main() {
     let parameters = args.param.iter().cloned().collect();
     for name in &args.targets {
         let job = match zinnfile.jobs.get(name) {
-            Some(job) => resolve(job.realize(name, &zinnfile.jobs, &handlebars, &constants, &parameters)),
+            Some(job) => resolve(job.realize(name, &zinnfile.jobs, &mut handlebars, &constants, &parameters)),
             None => resolve(Err(ZinnError::JobNotFound(name.to_owned()))),
         };
         for dep in job.transitive_dependencies() {

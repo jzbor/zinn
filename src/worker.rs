@@ -10,6 +10,7 @@ pub fn run_worker(queue: Queue, mut tracker: impl ThreadStateTracker, options: O
         if let Some(job) = queue.fetch() {
             tracker.set_prefix(job.to_string());
             let state = job.run(&mut tracker, &options)
+                .map_err(|e| { eprintln!("{}", e); e })  // TODO: Better error messages
                 .unwrap_or(JobState::Failed);
             tracker.job_completed(job.clone(), state);
             queue.finished(job, state);

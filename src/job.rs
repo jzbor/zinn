@@ -7,12 +7,14 @@ use std::io::{BufRead, BufReader};
 use std::sync::Arc;
 
 use handlebars::Handlebars;
+use handlebars::Renderable;
 use serde::{Deserialize, Serialize};
 
 use crate::barkeeper::ThreadStateTracker;
 use crate::error::*;
 use crate::queue::JobState;
 use crate::Options;
+use crate::TemplateType;
 
 
 /// Template for a job as described in the Zinnfile
@@ -98,15 +100,12 @@ pub type JobRealization = Arc<InnerJobRealization>;
 
 impl JobDescription {
     /// Resolve templates and dependencies
-    pub fn realize(&self, name: &str, job_descriptions: &HashMap<String, JobDescription>, handlebars: &Handlebars, constants: &HashMap<String, String>, parameters: &HashMap<String, String>) -> ZinnResult<JobRealization> {
+    pub fn realize(&self, name: &str, job_descriptions: &HashMap<String, JobDescription>, handlebars: &mut Handlebars, constants: &HashMap<String, String>, parameters: &HashMap<String, String>) -> ZinnResult<JobRealization> {
         let mut dependencies = Vec::new();
         let mut param_values = Vec::new();
         let name = name.to_owned();
 
-        let mut combined_vars = HashMap::new();
-        for (name, value) in constants {
-            combined_vars.insert(name.clone(), handlebars.render_template(value, &())?);
-        }
+        let mut combined_vars = constants.clone();
 
         for arg in &self.args {
             match parameters.get(arg).or(self.defaults.get(arg)) {
@@ -121,33 +120,35 @@ impl JobDescription {
         // render input files
         let mut inputs = Vec::new();
         if let Some(input_str) = &self.inputs {
-            let rendered_input_str = handlebars.render_template(input_str, &combined_vars)?;
+            let rendered_input_str = Self::render_component(TemplateType::Inputs, &["", "", &name], input_str, handlebars, &combined_vars)?;
             let additional_inputs = rendered_input_str.split(char::is_whitespace)
                 .filter(|v| !v.is_empty())
                 .map(|s| s.to_owned());
             inputs.extend(additional_inputs)
         }
         for input in &self.input_list {
-            inputs.push(handlebars.render_template(input, &combined_vars)?);
+            let rendered = Self::render_component(TemplateType::InputListElem, &[input, "", &name], input, handlebars, &combined_vars)?;
+            inputs.push(rendered);
         }
 
         // render output files
         let mut outputs = Vec::new();
         if let Some(output_str) = &self.outputs {
-            let rendered_output_str = handlebars.render_template(output_str, &combined_vars)?;
+            let rendered_output_str = Self::render_component(TemplateType::Outputs, &["", "", &name], output_str, handlebars, &combined_vars)?;
             let additional_outputs = rendered_output_str .split(char::is_whitespace)
                 .filter(|v| !v.is_empty())
                 .map(|s| s.to_owned());
             outputs.extend(additional_outputs)
         }
-        for output in &self.output_list {
-            outputs.push(handlebars.render_template(output, &combined_vars)?);
+        for (i, output) in self.output_list.iter().enumerate() {
+            let rendered = Self::render_component(TemplateType::OutputListElem, &[&i.to_string(), "", &name], output, handlebars, &combined_vars)?;
+            outputs.push(rendered);
         }
 
-        for dep in &self.requires {
-            let mut realized_dep_desc = dep.with.clone();
-            for val in realized_dep_desc.values_mut() {
-                *val = handlebars.render_template(val, &combined_vars)?;
+        for (i, dep) in self.requires.iter().enumerate() {
+            let mut realized_dep_params = dep.with.clone();
+            for (key, val) in &mut realized_dep_params {
+                *val = Self::render_component(TemplateType::DependencyParam, &[&i.to_string(), key, &name], val, handlebars, &combined_vars)?;
             }
 
             let dep_desc = match job_descriptions.get(&dep.job) {
@@ -156,23 +157,23 @@ impl JobDescription {
             };
 
             if let Some(with_list) = &dep.foreach {
-                let inputs = handlebars.render_template(&with_list.r#in, &combined_vars)?;
+                let inputs = Self::render_component(TemplateType::ForEach, &[&i.to_string(), "", &name], &with_list.r#in, handlebars, &combined_vars)?;
                 let val_list = inputs.split(char::is_whitespace)
                     .filter(|v| !v.is_empty());
                 for val in val_list {
                     // mutating the environment is fine, as it will be overridden
                     // for every iteration with the proper value.
-                    realized_dep_desc.insert(with_list.var.to_owned(), val.to_owned());
-                    let dep_realization = dep_desc.realize(&dep.job, job_descriptions, handlebars, constants, &realized_dep_desc)?;
+                    realized_dep_params.insert(with_list.var.to_owned(), val.to_owned());
+                    let dep_realization = dep_desc.realize(&dep.job, job_descriptions, handlebars, constants, &realized_dep_params)?;
                     dependencies.push(dep_realization);
                 }
             } else {
-                let dep_realization = dep_desc.realize(&dep.job, job_descriptions, handlebars, constants, &realized_dep_desc)?;
+                let dep_realization = dep_desc.realize(&dep.job, job_descriptions, handlebars, constants, &realized_dep_params)?;
                 dependencies.push(dep_realization);
             }
         }
 
-        let run = handlebars.render_template(&self.run, &combined_vars)?;
+        let run = Self::render_component(TemplateType::Run, &["", "", &name], &self.run, handlebars, &combined_vars)?;
         let name = name.replace('\n', "");
         let interactive = self.interactive;
 
@@ -183,6 +184,18 @@ impl JobDescription {
 
     pub fn args(&self) -> &Vec<String> {
         &self.args
+    }
+
+    fn render_component(tt: TemplateType, suffix: &[&str; 3], template: &str, handlebars: &mut Handlebars, context: &HashMap<String, String>) -> ZinnResult<String> {
+        let template_name = tt.to_name(suffix);
+        match handlebars.get_template(&template_name) {
+            Some(_) => Ok(handlebars.render(&template_name, context)?),
+            None => {
+                let template = handlebars::Template::compile_with_name(template, template_name.clone())?;
+                handlebars.register_template(&template_name, template);
+                Ok(handlebars.render(&template_name, context)?)
+            },
+        }
     }
 }
 
