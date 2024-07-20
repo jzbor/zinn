@@ -8,7 +8,8 @@ pub fn run_worker(queue: Queue, mut tracker: impl ThreadStateTracker, options: O
         tracker.clear_status();
 
         if let Some(job) = queue.fetch() {
-            tracker.set_prefix(job.to_string());
+            tracker.set_prefix(console::style(job.to_string()).cyan().to_string());
+            // tracker.set_prefix(job.to_string());
             let result = job.run(&mut tracker, &options);
             let state = match &result {
                 Ok(state) => *state,
