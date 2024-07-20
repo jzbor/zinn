@@ -142,31 +142,21 @@ impl Args {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-enum TemplateType {
-    Inputs,
-    InputListElem,
-    Outputs,
-    OutputListElem,
-    DependencyParam,
-    ForEach,
-    Run,
-}
+fn render_component(path: &[&str], template: &str, handlebars: &mut Handlebars, context: &HashMap<String, String>) -> ZinnResult<String> {
+    assert!(!path.is_empty());
 
+    if let Some(name) = path.iter().find(|c| c.contains(':')) {
+        return Err(ZinnError::ColonInTemplateName(name.to_string()));
+    }
 
-impl TemplateType {
-    fn to_name(self, suffix: &[&str; 3]) -> String {
-        use TemplateType::*;
-        // prefixes must not be the same or similar
-        match self {
-            Inputs => format!("inputs-{}-{}-{}", suffix[0], suffix[1], suffix[2]),
-            InputListElem => format!("input-file-{}-{}-{}", suffix[0], suffix[1], suffix[2]),
-            Outputs => format!("outputs-{}-{}-{}", suffix[0], suffix[1], suffix[2]),
-            OutputListElem => format!("output-file-{}-{}-{}", suffix[0], suffix[1], suffix[2]),
-            DependencyParam => format!("dependency-param-{}-{}-{}", suffix[0], suffix[1], suffix[2]),
-            ForEach => format!("dependency-foreach-{}-{}-{}", suffix[0], suffix[1], suffix[2]),
-            Run => format!("run-{}-{}-{}", suffix[0], suffix[1], suffix[2]),
-        }
+    let template_name = path.join(":");
+    match handlebars.get_template(&template_name) {
+        Some(_) => Ok(handlebars.render(&template_name, context)?),
+        None => {
+            let template = handlebars::Template::compile_with_name(template, template_name.clone())?;
+            handlebars.register_template(&template_name, template);
+            Ok(handlebars.render(&template_name, context)?)
+        },
     }
 }
 
@@ -297,7 +287,8 @@ fn main() {
     // parse constants
     let mut constants = HashMap::new();
     for (name, value) in &zinnfile.constants {
-        let realized = resolve(handlebars.render_template(value, &constants));
+        let template_path = ["constants", name];
+        let realized = resolve(render_component(&template_path, value, &mut handlebars, &constants));
         constants.insert(name.to_owned(), realized);
     }
 

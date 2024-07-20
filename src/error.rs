@@ -45,6 +45,9 @@ pub enum ZinnError {
 
     #[error("Unable to change directory")]
     ChdirError(),
+
+    #[error("Colon (':') in template name (\"{0}\")")]
+    ColonInTemplateName(String),
 }
 
 pub fn die(e: impl Into<ZinnError>) -> ! {
