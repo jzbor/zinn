@@ -254,7 +254,15 @@ impl InnerJobRealization {
             process
         };
 
+        let out_lines = out_lines.into_iter().rev().collect();
+
         let status = process.wait()?;
+        if !status.success() {
+            match status.code() {
+                Some(code) => return Err(ZinnError::ChildFailed(code, out_lines)),
+                None => return Err(ZinnError::ChildSignaled()),
+            }
+        }
 
         for file in &self.outputs {
             if !Path::new(file).exists() {
@@ -262,16 +270,7 @@ impl InnerJobRealization {
             }
         }
 
-        let out_lines = out_lines.into_iter().rev().collect();
-
-        if !status.success() {
-            match status.code() {
-                Some(code) => Err(ZinnError::ChildFailed(code, out_lines)),
-                None => Err(ZinnError::ChildSignaled()),
-            }
-        } else {
-            Ok(JobState::Finished)
-        }
+        Ok(JobState::Finished)
     }
 
     fn check_input_files(&self) -> ZinnResult<()> {
