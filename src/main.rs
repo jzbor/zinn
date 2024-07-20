@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
 use std::path::Path;
-use std::{env, fs, thread};
+use std::{env, fs, process, thread};
 
 use error::*;
 use job::*;
@@ -208,6 +208,10 @@ where
     queue.done();
     for thread in threads {
         let _ = thread.join();
+    }
+
+    if queue.has_failed() {
+        process::exit(1);
     }
 }
 

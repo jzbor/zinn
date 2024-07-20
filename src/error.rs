@@ -13,7 +13,7 @@ pub enum ZinnError {
     Yaml(#[from] serde_yaml::Error),
 
     #[error("Child exited with error {0}")]
-    ChildFailed(i32),
+    ChildFailed(i32, Vec<String>),
 
     #[error("Child terminated by signal")]
     ChildSignaled(),

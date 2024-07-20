@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::VecDeque;
 use std::fmt;
 use std::fs;
 use std::path::Path;
@@ -14,6 +15,9 @@ use crate::error::*;
 use crate::queue::JobState;
 use crate::render_component;
 use crate::Options;
+
+/// Maximum number of lines saved for a process to be printed on error.
+const MAX_SAVED_OUTPUT_LINES: usize = 20;
 
 
 /// Template for a job as described in the Zinnfile
@@ -217,6 +221,10 @@ impl InnerJobRealization {
             tracker.trace(self.cmd());
         }
 
+        // in order to being able to discard the oldest lines a VecDeque is used to track output
+        // lines and reversed before returning the last N lines the caller
+        let mut out_lines = VecDeque::new();
+
         let cmd_with_exit_setting = format!("set -e; {}", self.run);
         let mut  process = if self.interactive {
             // run job interactively
@@ -235,7 +243,11 @@ impl InnerJobRealization {
                 .spawn()?;
 
             for line in BufReader::new(io_reader).lines().map_while(Result::ok) {
-                tracker.cmd_output(&self.to_string(), &line, options.verbose);
+                tracker.cmd_output(&line, options.verbose);
+
+                // append line to limited output buffer
+                out_lines.push_front(line);
+                out_lines.truncate(MAX_SAVED_OUTPUT_LINES);
             }
             tracker.flush_cmd_output(&self.to_string(), options.verbose);
 
@@ -250,9 +262,11 @@ impl InnerJobRealization {
             }
         }
 
+        let out_lines = out_lines.into_iter().rev().collect();
+
         if !status.success() {
             match status.code() {
-                Some(code) => Err(ZinnError::ChildFailed(code)),
+                Some(code) => Err(ZinnError::ChildFailed(code, out_lines)),
                 None => Err(ZinnError::ChildSignaled()),
             }
         } else {
@@ -318,7 +332,12 @@ impl fmt::Display for InnerJobRealization {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "[{}]", self.name())?;
         if !self.param_values.is_empty() {
-            write!(f, " {}", self.param_values.join(" "))?
+            let param_str = self.param_values.iter()
+                .filter(|s| !s.is_empty())
+                .map(|s| "'".to_owned() + s.trim() + "'")
+                .collect::<Vec<_>>()
+                .join(" ");
+            write!(f, " {}", param_str)?
         }
         Ok(())
     }

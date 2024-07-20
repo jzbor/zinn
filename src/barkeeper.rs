@@ -13,7 +13,7 @@ pub trait ThreadStateTracker: Send {
     fn start(&self);
     fn set_prefix(&mut self, prefix: String);
     fn clear_status(&mut self);
-    fn cmd_output(&mut self, job: &str, out: &str, verbose: bool);
+    fn cmd_output(&mut self, out: &str, verbose: bool);
     fn flush_cmd_output(&mut self, job: &str, verbose: bool);
     fn trace(&mut self, cmd: &str);
 }
@@ -33,7 +33,7 @@ pub struct ThreadBarkeeper {
 }
 
 pub struct DummyBarkeeper {}
-pub struct DummyThreadBarkeeper {}
+pub struct DummyThreadBarkeeper { prefix: String }
 
 
 #[cfg(feature = "progress")]
@@ -93,7 +93,7 @@ impl StateTracker for DummyBarkeeper {
 
     fn for_threads(&self, nthreads: usize) -> Vec<DummyThreadBarkeeper> {
         (0..nthreads).map(|_| {
-            DummyThreadBarkeeper {}
+            DummyThreadBarkeeper { prefix: String::new() }
         }).collect()
     }
 }
@@ -102,18 +102,27 @@ impl ThreadStateTracker for DummyThreadBarkeeper {
     fn job_completed(&self, job: JobRealization, state: JobState, error: Option<ZinnError>) {
         println!("{}", job_finished_msg(job, state));
         if let Some(e) = error {
+            if let ZinnError::ChildFailed(_, lines) = &e {
+                for line in lines {
+                    println!("{}: {}", self.prefix.to_owned(), line);
+                }
+            }
             println!("{}", e);
         }
     }
 
     fn start(&self) {}
 
-    fn set_prefix(&mut self, _prefix: String) {}
+    fn set_prefix(&mut self, prefix: String) {
+        self.prefix = prefix;
+    }
 
     fn clear_status(&mut self) {}
 
-    fn cmd_output(&mut self, job: &str, out: &str, _verbose: bool) {
-        println!("{}: {}", job, out);
+    fn cmd_output(&mut self, out: &str, verbose: bool) {
+        if verbose {
+            println!("{}: {}", self.prefix, out);
+        }
     }
 
     fn flush_cmd_output(&mut self, _job: &str, _verbose: bool) {}
@@ -134,6 +143,12 @@ impl ThreadStateTracker for ThreadBarkeeper {
     fn job_completed(&self, job: JobRealization, state: JobState, error: Option<ZinnError>) {
         self.bar.println(job_finished_msg(job, state));
         if let Some(e) = error {
+            if let ZinnError::ChildFailed(_, lines) = &e {
+                for line in lines {
+                    let prefix = self.bar.prefix();
+                    self.bar.println(prefix + ": " + line);
+                }
+            }
             self.bar.println(e.to_string());
         }
         self.main_bar.inc(1)
@@ -147,12 +162,13 @@ impl ThreadStateTracker for ThreadBarkeeper {
         self.bar.set_message("");
     }
 
-    fn cmd_output(&mut self, job: &str, out: &str, verbose: bool) {
+    fn cmd_output(&mut self, out: &str, verbose: bool) {
         self.bar.set_message(out.to_owned());
 
         if verbose {
             if let Some(line) = self.last_line.take() {
-                self.bar.println(format!("{}: {}", job, line));
+                let prefix = self.bar.prefix();
+                self.bar.println(format!("{}: {}", prefix, line));
             }
             self.last_line = Some(out.to_owned());
         }
