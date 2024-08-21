@@ -120,8 +120,9 @@ impl ThreadStateTracker for DummyThreadBarkeeper {
     fn clear_status(&mut self) {}
 
     fn cmd_output(&mut self, out: &str, verbose: bool) {
+        let line = console::strip_ansi_codes(out).to_string();
         if verbose {
-            println!("{}: {}", self.prefix, out);
+            println!("{}: {}", self.prefix, line);
         }
     }
 
@@ -163,14 +164,15 @@ impl ThreadStateTracker for ThreadBarkeeper {
     }
 
     fn cmd_output(&mut self, out: &str, verbose: bool) {
-        self.bar.set_message(out.to_owned());
+        let line = console::strip_ansi_codes(out).to_string();
+        self.bar.set_message(line.to_owned());
 
         if verbose {
             if let Some(line) = self.last_line.take() {
                 let prefix = self.bar.prefix();
                 self.bar.println(format!("{}: {}", prefix, line));
             }
-            self.last_line = Some(out.to_owned());
+            self.last_line = Some(line);
         }
     }
 
