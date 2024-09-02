@@ -29,6 +29,11 @@
     overlays.default = _: prev: {
       zinn = self.packages.${prev.system}.default;
     };
+
+    nixConfig = {
+      extra-substituters = [ "https://cache.jzbor.de/public" ];
+      extra-trusted-public-keys = [ "public:AdkE6qSLmWKFX4AptLFl+n+RTPIo1lrBhT2sPgfg5s4=" ];
+    };
   };
 }
 
