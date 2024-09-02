@@ -10,10 +10,8 @@
 
   outputs = { self, nixpkgs, cf, crane }:
   cf.lib.flakeForDefaultSystems (system:
-  with builtins;
   let
-    pkgs = nixpkgs.legacyPackages.${system};
-    craneLib = (crane.mkLib nixpkgs.legacyPackages.${system});
+    craneLib = crane.mkLib nixpkgs.legacyPackages.${system};
   in {
     ### PACKAGES ###
     packages = {
@@ -26,16 +24,9 @@
         # doCheck = true;
       };
     };
-
-    ### DEVELOPMENT SHELLS ###
-    devShells.default = pkgs.mkShellNoCC {
-      name = self.packages.${system}.default.name;
-      nativeBuildInputs = nativeBuildInputs ++ devInputs;
-      inherit buildInputs;
-    };
   }) // {
     ### OVERLAY ###
-    overlays.default = final: prev: {
+    overlays.default = _: prev: {
       zinn = self.packages.${prev.system}.default;
     };
   };
